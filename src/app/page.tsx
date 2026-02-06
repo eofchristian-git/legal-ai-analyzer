@@ -1,65 +1,144 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  FileText,
+  Shield,
+  CheckSquare,
+  AlertTriangle,
+  ArrowRight,
+  Scale,
+} from "lucide-react";
+
+interface DashboardStats {
+  contracts: number;
+  ndas: number;
+  compliance: number;
+  risks: number;
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats>({
+    contracts: 0,
+    ndas: 0,
+    compliance: 0,
+    risks: 0,
+  });
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [contracts, ndas, compliance, risks] = await Promise.all([
+          fetch("/api/contracts").then((r) => r.json()),
+          fetch("/api/nda-triage").then((r) => r.json()),
+          fetch("/api/compliance").then((r) => r.json()),
+          fetch("/api/risk-assessment").then((r) => r.json()),
+        ]);
+        setStats({
+          contracts: Array.isArray(contracts) ? contracts.length : 0,
+          ndas: Array.isArray(ndas) ? ndas.length : 0,
+          compliance: Array.isArray(compliance) ? compliance.length : 0,
+          risks: Array.isArray(risks) ? risks.length : 0,
+        });
+      } catch {
+        // Stats will stay at 0
+      }
+    }
+    loadStats();
+  }, []);
+
+  const features = [
+    {
+      title: "Contract Review",
+      description:
+        "Upload contracts for clause-by-clause analysis with GREEN/YELLOW/RED flags and redline suggestions.",
+      icon: FileText,
+      href: "/contracts",
+      stat: stats.contracts,
+      statLabel: "contracts analyzed",
+      color: "text-blue-600",
+    },
+    {
+      title: "NDA Triage",
+      description:
+        "Rapidly screen incoming NDAs against standard criteria and classify for routing.",
+      icon: Shield,
+      href: "/nda-triage",
+      stat: stats.ndas,
+      statLabel: "NDAs triaged",
+      color: "text-emerald-600",
+    },
+    {
+      title: "Compliance Check",
+      description:
+        "Check contracts against GDPR, CCPA, and other regulatory requirements.",
+      icon: CheckSquare,
+      href: "/compliance",
+      stat: stats.compliance,
+      statLabel: "checks completed",
+      color: "text-purple-600",
+    },
+    {
+      title: "Risk Assessment",
+      description:
+        "Evaluate legal risks using a severity-by-likelihood framework with mitigation options.",
+      icon: AlertTriangle,
+      href: "/risk-assessment",
+      stat: stats.risks,
+      statLabel: "assessments done",
+      color: "text-orange-600",
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div>
+      <PageHeader
+        title="Legal AI Analyzer"
+        description="AI-powered contract review, NDA triage, compliance checking, and risk assessment"
+      />
+      <div className="p-8">
+        <div className="mb-8 flex items-center gap-4 rounded-lg border bg-gradient-to-r from-primary/5 to-primary/10 p-6">
+          <Scale className="h-10 w-10 text-primary" />
+          <div>
+            <h2 className="text-lg font-semibold">Welcome to Legal AI</h2>
+            <p className="text-sm text-muted-foreground">
+              Upload a contract, NDA, or legal document to get started with
+              AI-powered analysis. All analysis is powered by Claude and the
+              Anthropic legal skills framework.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {features.map((feature) => (
+            <Card key={feature.href} className="group hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <feature.icon className={`h-5 w-5 ${feature.color}`} />
+                  <CardTitle className="text-base">{feature.title}</CardTitle>
+                </div>
+                <span className="text-2xl font-bold text-muted-foreground">
+                  {feature.stat}
+                </span>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  {feature.description}
+                </p>
+                <Link href={feature.href}>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    Get started <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

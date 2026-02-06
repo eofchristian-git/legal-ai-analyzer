@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Document {
+  id            String   @id @default(cuid())
+  filename      String
+  fileType      String
+  filePath      String
+  extractedText String
+  fileSize      Int
+  pageCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contracts        Contract[]
+  ndaTriages       NdaTriage[]
+  complianceChecks ComplianceCheck[]
+  riskAssessments  RiskAssessment[]
+}
+
+model Contract {
+  id           String    @id @default(cuid())
+  documentId   String
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title        String
+  contractType String?
+  ourSide      String
+  counterparty String?
+  deadline     DateTime?
+  focusAreas   String?
+  dealContext   String?
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  analysis ContractAnalysis?
+}
+
+model ContractAnalysis {
+  id                  String   @id @default(cuid())
+  contractId          String   @unique
+  contract            Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  overallRisk         String
+  greenCount          Int      @default(0)
+  yellowCount         Int      @default(0)
+  redCount            Int      @default(0)
+  rawAnalysis         String
+  clauseAnalyses      String
+  redlineSuggestions  String
+  negotiationStrategy String?
+  executiveSummary    String?
+  modelUsed           String
+  tokensUsed          Int?
+  reviewBasis         String
+  createdAt           DateTime @default(now())
+}
+
+model NdaTriage {
+  id               String   @id @default(cuid())
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title            String
+  context          String?
+  status           String   @default("pending")
+  classification   String?
+  ndaType          String?
+  term             String?
+  governingLaw     String?
+  rawAnalysis      String?
+  screeningResults String?
+  issuesFound      String?
+  recommendation   String?
+  modelUsed        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ComplianceCheck {
+  id            String   @id @default(cuid())
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title         String
+  regulations   String
+  analysisType  String
+  status        String   @default("pending")
+  rawAnalysis   String?
+  findings      String?
+  overallStatus String?
+  modelUsed     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RiskAssessment {
+  id                String   @id @default(cuid())
+  documentId        String
+  document          Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title             String
+  category          String
+  context           String?
+  status            String   @default("pending")
+  severity          Int?
+  likelihood        Int?
+  riskScore         Int?
+  riskLevel         String?
+  rawAnalysis       String?
+  riskMemo          String?
+  mitigationOptions String?
+  modelUsed         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Playbook {
+  id        String   @id @default(cuid())
+  content   String
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
