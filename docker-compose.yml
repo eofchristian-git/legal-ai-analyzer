@@ -8,6 +8,7 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DATABASE_URL=file:/app/data/legal-ai.db
+      - AUTH_SECRET=${AUTH_SECRET}
     volumes:
       - legal-data:/app/data
       - legal-uploads:/app/uploads

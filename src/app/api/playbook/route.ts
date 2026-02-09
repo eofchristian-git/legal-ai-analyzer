@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireRole } from "@/lib/auth-utils";
 
 export async function GET() {
   try {
@@ -18,6 +19,10 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  // Only admin and legal roles can edit the playbook
+  const { error: authError } = await requireRole("admin", "legal");
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const { content } = body;
