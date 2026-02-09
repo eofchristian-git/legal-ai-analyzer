@@ -79,3 +79,4 @@ Docker-ready with standalone Next.js output. `Dockerfile` uses multi-stage build
 ## References
 
 - `.agents/codebase-patterns.md` — Code patterns, conventions, component inventory, lib modules
+- `.agents/ui-rules.md` — UI design rules: layout patterns, form conventions, error states, typography, spacing
