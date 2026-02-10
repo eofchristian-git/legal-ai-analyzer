@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { seedRules } from "./seed-rules";
 
 const prisma = new PrismaClient();
 
@@ -45,6 +46,9 @@ async function main() {
   for (const g of groups) {
     console.log(`  ${g.sortOrder}. ${g.name} (${g.slug})`);
   }
+
+  // Seed the 44 clause category rules
+  await seedRules();
 }
 
 main()
