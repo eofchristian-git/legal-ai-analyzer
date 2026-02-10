@@ -58,6 +58,7 @@ model ContractAnalysis {
   modelUsed           String
   tokensUsed          Int?
   reviewBasis         String
+  playbookVersionId   String?
   createdAt           DateTime @default(now())
 }
 
@@ -119,10 +120,76 @@ model RiskAssessment {
 
 model Playbook {
   id        String   @id @default(cuid())
-  content   String
-  version   Int      @default(1)
+  version   Int      @default(0)
+  updatedBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  rules     PlaybookRule[]
+  snapshots PlaybookSnapshot[]
+}
+
+model PlaybookGroup {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  slug        String         @unique
+  sortOrder   Int            @default(0)
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  rules       PlaybookRule[]
+}
+
+model PlaybookRule {
+  id                  String         @id @default(cuid())
+  playbookId          String
+  playbook            Playbook       @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  groupId             String?
+  group               PlaybookGroup? @relation(fields: [groupId], references: [id])
+  title               String
+  description         String
+  country             String?
+  riskLevel           String
+  standardPosition    String
+  acceptableRange     String
+  escalationTrigger   String
+  negotiationGuidance String
+  deleted             Boolean  @default(false)
+  createdBy           String
+  updatedBy           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model PlaybookSnapshot {
+  id         String   @id @default(cuid())
+  playbookId String
+  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  version    Int
+  createdBy  String
+  createdAt  DateTime @default(now())
+
+  rules PlaybookSnapshotRule[]
+}
+
+model PlaybookSnapshotRule {
+  id                  String           @id @default(cuid())
+  snapshotId          String
+  snapshot            PlaybookSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  groupId             String?
+  groupName           String?
+  title               String
+  description         String
+  country             String?
+  riskLevel           String
+  standardPosition    String
+  acceptableRange     String
+  escalationTrigger   String
+  negotiationGuidance String
+  originalRuleId      String
+  createdBy           String
+  originalCreatedAt   DateTime
+  createdAt           DateTime         @default(now())
 }
 
 model User {

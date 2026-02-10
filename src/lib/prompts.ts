@@ -1,4 +1,38 @@
 import { loadSkill } from "./skills";
+import { getCountryByCode } from "./countries";
+
+export interface PlaybookRuleForPrompt {
+  title: string;
+  description: string;
+  country?: string | null;
+  riskLevel: string;
+  standardPosition: string;
+  acceptableRange: string;
+  escalationTrigger: string;
+  negotiationGuidance: string;
+}
+
+export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
+  return rules
+    .map((rule) => {
+      const country = rule.country
+        ? getCountryByCode(rule.country)?.name || rule.country
+        : "Global";
+      return [
+        `### ${rule.title}`,
+        "",
+        `**Business Context**: ${rule.description}`,
+        `**Jurisdiction**: ${country}`,
+        `**Risk Level**: ${rule.riskLevel}`,
+        "",
+        `- **Standard Position**: ${rule.standardPosition}`,
+        `- **Acceptable Range**: ${rule.acceptableRange}`,
+        `- **Escalation Trigger**: ${rule.escalationTrigger}`,
+        `- **Negotiation Guidance**: ${rule.negotiationGuidance}`,
+      ].join("\n");
+    })
+    .join("\n\n");
+}
 
 export async function buildContractReviewPrompt(params: {
   contractText: string;
@@ -6,13 +40,14 @@ export async function buildContractReviewPrompt(params: {
   deadline?: string;
   focusAreas?: string[];
   dealContext?: string;
-  playbook?: string;
+  playbookRules?: PlaybookRuleForPrompt[];
 }): Promise<{ systemPrompt: string; userMessage: string }> {
   const skill = await loadSkill("contract-review");
 
-  const systemPrompt = params.playbook
-    ? `${skill}\n\n## Organization Playbook\n\n${params.playbook}`
-    : `${skill}\n\n## Note\nNo organizational playbook is configured. Review against widely-accepted commercial standards and flag any unusual or one-sided provisions.`;
+  const systemPrompt =
+    params.playbookRules && params.playbookRules.length > 0
+      ? `${skill}\n\n## Organization Playbook\n\n${serializePlaybookRules(params.playbookRules)}`
+      : `${skill}\n\n## Note\nNo organizational playbook is configured. Review against widely-accepted commercial standards and flag any unusual or one-sided provisions.`;
 
   const parts = [
     "Please review the following contract.",
@@ -47,13 +82,14 @@ export async function buildContractReviewPrompt(params: {
 export async function buildNdaTriagePrompt(params: {
   ndaText: string;
   context?: string;
-  playbook?: string;
+  playbookRules?: PlaybookRuleForPrompt[];
 }): Promise<{ systemPrompt: string; userMessage: string }> {
   const skill = await loadSkill("nda-triage");
 
-  const systemPrompt = params.playbook
-    ? `${skill}\n\n## Organization NDA Standards\n\n${params.playbook}`
-    : skill;
+  const systemPrompt =
+    params.playbookRules && params.playbookRules.length > 0
+      ? `${skill}\n\n## Organization NDA Standards\n\n${serializePlaybookRules(params.playbookRules)}`
+      : skill;
 
   const parts = ["Please triage the following NDA.", ""];
 

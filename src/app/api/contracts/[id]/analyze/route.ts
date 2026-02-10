@@ -37,9 +37,11 @@ export async function POST(
       data: { status: "analyzing" },
     });
 
-    // Load the latest playbook if one exists
+    // Load the latest playbook with active rules
     const playbook = await db.playbook.findFirst({
-      orderBy: { version: "desc" },
+      include: {
+        rules: { where: { deleted: false } },
+      },
     });
 
     // Build the prompt
@@ -53,7 +55,7 @@ export async function POST(
       deadline: contract.deadline?.toISOString() || undefined,
       focusAreas,
       dealContext: contract.dealContext || undefined,
-      playbook: playbook?.content || undefined,
+      playbookRules: playbook?.rules.length ? playbook.rules : undefined,
     });
 
     // Create the SSE stream
@@ -112,7 +114,8 @@ export async function POST(
               executiveSummary: parsed.executiveSummary || null,
               modelUsed,
               tokensUsed,
-              reviewBasis: playbook ? "playbook" : "standard",
+              reviewBasis: playbook?.rules.length ? "playbook" : "standard",
+              playbookVersionId: playbook?.version ? String(playbook.version) : null,
             },
           });
 
