@@ -13,6 +13,7 @@ interface RuleInput {
   acceptableRange: string;
   escalationTrigger: string;
   negotiationGuidance: string;
+  groupId?: string | null;
 }
 
 export async function POST(req: NextRequest) {
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
     const newVersion = playbook.version + 1;
     const userId = session!.user.id;
 
+    // Build group name lookup for snapshot rules
+    const allGroups = await db.playbookGroup.findMany();
+    const groupMap = Object.fromEntries(allGroups.map((g) => [g.id, g.name]));
+
     const result = await db.$transaction(async (tx) => {
       // Soft-delete all current active rules
       await tx.playbookRule.updateMany({
@@ -80,6 +85,7 @@ export async function POST(req: NextRequest) {
             description: r.description.trim(),
             country: r.country || null,
             riskLevel: r.riskLevel,
+            groupId: r.groupId || null,
             standardPosition: r.standardPosition.trim(),
             acceptableRange: r.acceptableRange.trim(),
             escalationTrigger: r.escalationTrigger.trim(),
@@ -114,6 +120,8 @@ export async function POST(req: NextRequest) {
           description: rule.description,
           country: rule.country,
           riskLevel: rule.riskLevel,
+          groupId: rule.groupId,
+          groupName: rule.groupId ? groupMap[rule.groupId] || null : null,
           standardPosition: rule.standardPosition,
           acceptableRange: rule.acceptableRange,
           escalationTrigger: rule.escalationTrigger,
@@ -143,6 +151,7 @@ export async function POST(req: NextRequest) {
         description: r.description,
         country: r.country,
         riskLevel: r.riskLevel,
+        groupId: r.groupId,
         standardPosition: r.standardPosition,
         acceptableRange: r.acceptableRange,
         escalationTrigger: r.escalationTrigger,

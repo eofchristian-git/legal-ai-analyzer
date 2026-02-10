@@ -62,12 +62,18 @@ export async function GET(req: NextRequest) {
       createdByName: userMap[rule.createdBy] || "Unknown",
     }));
 
+    // Fetch playbook groups
+    const groups = await db.playbookGroup.findMany({
+      orderBy: { sortOrder: "asc" },
+    });
+
     return NextResponse.json({
       id: playbook.id,
       version: playbook.version,
       updatedAt: playbook.updatedAt,
       updatedByName: updatedByUser?.name || null,
       rules: rulesWithNames,
+      groups,
     });
   } catch (error) {
     console.error("Failed to get playbook:", error);

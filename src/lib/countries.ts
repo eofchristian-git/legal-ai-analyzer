@@ -4,6 +4,8 @@ export interface Country {
   flag: string;
 }
 
+
+
 export const COUNTRIES: Country[] = [
   { code: "AE", name: "United Arab Emirates", flag: "🇦🇪" },
   { code: "AT", name: "Austria", flag: "🇦🇹" },

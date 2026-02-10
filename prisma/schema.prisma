@@ -129,10 +129,23 @@ model Playbook {
   snapshots PlaybookSnapshot[]
 }
 
+model PlaybookGroup {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  slug        String         @unique
+  sortOrder   Int            @default(0)
+  description String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  rules       PlaybookRule[]
+}
+
 model PlaybookRule {
-  id                  String   @id @default(cuid())
+  id                  String         @id @default(cuid())
   playbookId          String
-  playbook            Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  playbook            Playbook       @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  groupId             String?
+  group               PlaybookGroup? @relation(fields: [groupId], references: [id])
   title               String
   description         String
   country             String?
@@ -163,6 +176,8 @@ model PlaybookSnapshotRule {
   id                  String           @id @default(cuid())
   snapshotId          String
   snapshot            PlaybookSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  groupId             String?
+  groupName           String?
   title               String
   description         String
   country             String?
