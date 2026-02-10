@@ -59,16 +59,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Load the playbook if one exists
+    // Load the playbook with active rules
     const playbook = await db.playbook.findFirst({
-      orderBy: { updatedAt: "desc" },
+      include: {
+        rules: { where: { deleted: false } },
+      },
     });
 
     // Build the prompt
     const { systemPrompt, userMessage } = await buildNdaTriagePrompt({
       ndaText: document.extractedText,
       context: context || undefined,
-      playbook: playbook?.content,
+      playbookRules: playbook?.rules.length ? playbook.rules : undefined,
     });
 
     // Call Claude for analysis

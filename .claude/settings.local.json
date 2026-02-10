@@ -9,7 +9,9 @@
       "Bash(dir *)",
       "Bash(find *)",
       "Bash(git add:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(npx next build:*)",
+      "Bash(cd *)"
     ]
   }
 }
