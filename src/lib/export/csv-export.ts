@@ -8,6 +8,7 @@ interface ExportFinding {
   riskLevel: string;
   matchedRuleTitle: string;
   summary: string;
+  excerpt: string;
   fallbackText: string;
   triageDecision: string | null;
   triageNote: string | null;
@@ -35,6 +36,7 @@ export function generateFindingsCsv(
     "Risk Level",
     "Matched Rule",
     "Summary",
+    "Excerpt",
     "Fallback Text",
     "Decision",
     "Note",
@@ -54,6 +56,7 @@ export function generateFindingsCsv(
         "",
         "",
         "",
+        "",
       ]);
     } else {
       for (const finding of clause.findings) {
@@ -63,6 +66,7 @@ export function generateFindingsCsv(
           finding.riskLevel,
           finding.matchedRuleTitle,
           finding.summary,
+          finding.excerpt || "",
           finding.fallbackText,
           finding.triageDecision || "Pending",
           finding.triageNote || "",

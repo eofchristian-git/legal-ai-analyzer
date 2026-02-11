@@ -64,6 +64,7 @@ export async function GET(
         riskLevel: f.riskLevel,
         matchedRuleTitle: f.matchedRuleTitle,
         summary: f.summary,
+        excerpt: f.excerpt || "",
         fallbackText: f.fallbackText,
         triageDecision: f.triageDecision,
         triageNote: f.triageNote,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Check, AlertTriangle, X, MessageSquare } from "lucide-react";
+import { Check, AlertTriangle, X } from "lucide-react";
 import type { TriageDecision } from "./types";
 
 interface TriageControlsProps {
@@ -47,7 +47,6 @@ export function TriageControls({
   disabled,
   onDecision,
 }: TriageControlsProps) {
-  const [showNote, setShowNote] = useState(!!currentNote);
   const [note, setNote] = useState(currentNote || "");
 
   function handleDecision(decision: TriageDecision) {
@@ -88,17 +87,8 @@ export function TriageControls({
         })}
       </div>
 
-      {/* Note toggle + input */}
-      {!showNote && !disabled && (
-        <button
-          onClick={() => setShowNote(true)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <MessageSquare className="h-3 w-3" />
-          Add note
-        </button>
-      )}
-      {showNote && (
+      {/* Note input — shown after a triage decision is made */}
+      {currentDecision && (
         <Input
           placeholder="Optional triage note..."
           value={note}

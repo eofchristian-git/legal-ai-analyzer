@@ -72,7 +72,8 @@ model ContractAnalysis {
   createdByUser       User?             @relation("AnalysesCreated", fields: [createdBy], references: [id])
   createdAt           DateTime          @default(now())
 
-  clauses AnalysisClause[]
+  clauses           AnalysisClause[]
+  negotiationItems  NegotiationItem[]
 }
 
 model NdaTriage {
@@ -231,6 +232,7 @@ model AnalysisFinding {
   summary          String
   fallbackText     String
   whyTriggered     String
+  excerpt          String         @default("")
   triageDecision   String?
   triageNote       String?
   triagedBy        String?
@@ -262,6 +264,18 @@ model ActivityLog {
   targetId   String?
   metadata   String?
   createdAt  DateTime @default(now())
+}
+
+model NegotiationItem {
+  id          String           @id @default(cuid())
+  analysisId  String
+  analysis    ContractAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  priority    String           // "P1" | "P2" | "P3"
+  title       String
+  description String
+  clauseRef   String?
+  position    Int
+  createdAt   DateTime         @default(now())
 }
 
 model User {

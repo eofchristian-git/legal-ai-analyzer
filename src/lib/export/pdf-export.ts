@@ -11,6 +11,7 @@ interface ExportFinding {
   riskLevel: string;
   matchedRuleTitle: string;
   summary: string;
+  excerpt: string;
   fallbackText: string;
   triageDecision: string | null;
   triageNote: string | null;
@@ -97,6 +98,7 @@ export function generateFindingsPdf(
         finding.riskLevel,
         finding.matchedRuleTitle,
         finding.summary,
+        finding.excerpt || "",
         finding.triageDecision || "Pending",
       ]);
     }
@@ -105,17 +107,18 @@ export function generateFindingsPdf(
   if (tableBody.length > 0) {
     autoTable(doc, {
       startY: 28,
-      head: [["Clause", "Risk", "Rule", "Summary", "Decision"]],
+      head: [["Clause", "Risk", "Rule", "Summary", "Excerpt", "Decision"]],
       body: tableBody,
       theme: "striped",
       headStyles: { fillColor: [41, 128, 185] },
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 7, cellPadding: 2 },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 15 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 70 },
-        4: { cellWidth: 25 },
+        0: { cellWidth: 25 },
+        1: { cellWidth: 12 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 45 },
+        5: { cellWidth: 20 },
       },
       margin: { left: 10, right: 10 },
     });

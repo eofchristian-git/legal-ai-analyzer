@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/shared/severity-badge";
-import { DisclaimerBanner } from "@/components/shared/disclaimer-banner";
+
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import { Loader2 } from "lucide-react";
 
@@ -56,7 +56,6 @@ export default function NdaTriageDetailPage() {
         description={nda.document.filename}
       />
       <div className="space-y-6 p-8">
-        <DisclaimerBanner />
 
         {nda.classification && (
           <Card>

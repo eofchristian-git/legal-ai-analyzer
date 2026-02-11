@@ -7,52 +7,25 @@ import { getSessionOrUnauthorized } from "@/lib/auth-utils";
 
 export const maxDuration = 120; // Allow up to 2 minutes for Claude to respond
 
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/**
+ * Run the actual analysis work in the background.
+ * This is called as a fire-and-forget promise so the POST can return immediately.
+ */
+async function runAnalysis(id: string, userId: string | null) {
   try {
-    const { session } = await getSessionOrUnauthorized();
-    const userId = session?.user?.id ?? null;
-
-    const { id } = await params;
-
     // Load the contract with its document
     const contract = await db.contract.findUnique({
       where: { id },
       include: { document: true },
     });
 
-    if (!contract) {
-      return NextResponse.json(
-        { error: "Contract not found" },
-        { status: 404 }
-      );
+    if (!contract || !contract.document.extractedText) {
+      await db.contract.update({
+        where: { id },
+        data: { status: "error" },
+      });
+      return;
     }
-
-    if (!contract.document.extractedText) {
-      return NextResponse.json(
-        {
-          error:
-            "Document has no extracted text. Please upload a document with readable text content.",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Guard: reject if an analysis is already in progress
-    if (contract.status === "analyzing") {
-      return NextResponse.json(
-        { error: "Analysis is already in progress for this contract." },
-        { status: 409 }
-      );
-    }
-
-    // Update status to analyzing
-    await db.contract.update({
-      where: { id },
-      data: { status: "analyzing" },
-    });
 
     // Load the latest playbook with active rules
     const playbook = await db.playbook.findFirst({
@@ -131,17 +104,14 @@ export async function POST(
     // Call Claude (non-streaming) and wait for the full response
     let fullResponse: string;
     try {
-      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage });
+      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384 });
     } catch (claudeErr) {
       console.error("Claude API error:", claudeErr);
       await db.contract.update({
         where: { id },
         data: { status: "error" },
       });
-      return NextResponse.json(
-        { error: "AI analysis failed. Please try again." },
-        { status: 502 }
-      );
+      return;
     }
 
     // Parse the structured JSON response
@@ -154,14 +124,15 @@ export async function POST(
         where: { id },
         data: { status: "error" },
       });
-      return NextResponse.json(
-        {
-          error:
-            parseErr instanceof Error
-              ? parseErr.message
-              : "Failed to parse AI response",
-        },
-        { status: 422 }
+      return;
+    }
+
+    // Warn if no clauses were extracted (likely truncated or bad response)
+    if (parsed.clauses.length === 0) {
+      console.warn(
+        `[Analyze] No clauses extracted for contract ${id}. ` +
+        `Raw response length: ${fullResponse.length} chars. ` +
+        `This may indicate a truncated response (max_tokens too low) or a parsing issue.`
       );
     }
 
@@ -220,7 +191,7 @@ export async function POST(
           rawAnalysis: parsed.rawAnalysis,
           clauseAnalyses: JSON.stringify(legacyClauses),
           redlineSuggestions: JSON.stringify(redlines),
-          negotiationStrategy: parsed.negotiationStrategy || null,
+          negotiationStrategy: parsed.negotiationStrategy || (parsed.negotiationItems.length > 0 ? "" : null),
           executiveSummary: parsed.executiveSummary || null,
           modelUsed: "claude-sonnet-4-20250514",
           tokensUsed: 0,
@@ -262,6 +233,24 @@ export async function POST(
               summary: finding.summary,
               fallbackText: finding.fallbackText,
               whyTriggered: finding.whyTriggered,
+              excerpt: finding.excerpt || "",
+            },
+          });
+        }
+      }
+
+      // Create NegotiationItem rows from structured negotiation strategy
+      if (parsed.negotiationItems && parsed.negotiationItems.length > 0) {
+        for (let i = 0; i < parsed.negotiationItems.length; i++) {
+          const item = parsed.negotiationItems[i];
+          await tx.negotiationItem.create({
+            data: {
+              analysisId: analysis.id,
+              priority: ["P1", "P2", "P3"].includes(item.priority) ? item.priority : "P3",
+              title: item.title || "Untitled",
+              description: item.description || "",
+              clauseRef: item.clauseRef || null,
+              position: i + 1,
             },
           });
         }
@@ -280,6 +269,12 @@ export async function POST(
       0
     );
 
+    console.log(
+      `[Analyze] Completed for contract ${id}: ` +
+      `${parsed.clauses.length} clauses, ${totalFindings} findings, ` +
+      `risk=${parsed.overallRisk}, playbook=${hasPlaybookRules ? "yes" : "no"}`
+    );
+
     // Write activity log
     if (userId) {
       await db.activityLog.create({
@@ -296,21 +291,80 @@ export async function POST(
         },
       });
     }
-
-    return NextResponse.json({
-      success: true,
-      overallRisk: parsed.overallRisk,
-      greenCount: parsed.greenCount,
-      yellowCount: parsed.yellowCount,
-      redCount: parsed.redCount,
-      clauseCount: parsed.clauses.length,
-      findingCount: totalFindings,
-      warning: !hasPlaybookRules
-        ? "No playbook rules found. Analysis used standard review based on general best practices."
-        : undefined,
-    });
   } catch (error) {
-    console.error("Failed to run analysis:", error);
+    console.error(`[Analyze] Background analysis failed for contract ${id}:`, error);
+
+    // Attempt to set error status
+    try {
+      await db.contract.update({
+        where: { id },
+        data: { status: "error" },
+      });
+    } catch {
+      // Ignore secondary error
+    }
+  }
+}
+
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { session } = await getSessionOrUnauthorized();
+    const userId = session?.user?.id ?? null;
+
+    const { id } = await params;
+
+    // Load the contract with its document
+    const contract = await db.contract.findUnique({
+      where: { id },
+      include: { document: true },
+    });
+
+    if (!contract) {
+      return NextResponse.json(
+        { error: "Contract not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!contract.document.extractedText) {
+      return NextResponse.json(
+        {
+          error:
+            "Document has no extracted text. Please upload a document with readable text content.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Guard: reject if an analysis is already in progress
+    if (contract.status === "analyzing") {
+      return NextResponse.json(
+        { error: "Analysis is already in progress for this contract." },
+        { status: 409 }
+      );
+    }
+
+    // Update status to analyzing
+    await db.contract.update({
+      where: { id },
+      data: { status: "analyzing" },
+    });
+
+    // Fire-and-forget: run the analysis in the background.
+    // The client polls GET /api/contracts/[id] to detect completion.
+    runAnalysis(id, userId).catch((err) => {
+      console.error(`[Analyze] Unhandled error in background analysis:`, err);
+    });
+
+    return NextResponse.json(
+      { success: true, status: "analyzing" },
+      { status: 202 }
+    );
+  } catch (error) {
+    console.error("Failed to start analysis:", error);
 
     // Attempt to set error status
     try {
@@ -324,7 +378,46 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: "Failed to run contract analysis" },
+      { error: "Failed to start contract analysis" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE — Cancel / reset a stuck "analyzing" status.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const contract = await db.contract.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
+    if (!contract) {
+      return NextResponse.json(
+        { error: "Contract not found" },
+        { status: 404 }
+      );
+    }
+
+    if (contract.status === "analyzing") {
+      await db.contract.update({
+        where: { id },
+        data: { status: "error" },
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Failed to cancel analysis:", error);
+    return NextResponse.json(
+      { error: "Failed to cancel analysis" },
       { status: 500 }
     );
   }

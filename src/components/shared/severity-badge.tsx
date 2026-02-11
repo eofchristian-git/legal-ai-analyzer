@@ -9,24 +9,24 @@ interface SeverityBadgeProps {
 
 const config = {
   GREEN: {
-    label: "GREEN",
+    label: "Low",
     icon: CheckCircle2,
-    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
   },
   YELLOW: {
-    label: "YELLOW",
+    label: "Medium",
     icon: AlertTriangle,
-    className: "bg-amber-100 text-amber-800 border-amber-200",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
   },
   ORANGE: {
-    label: "ORANGE",
+    label: "Medium",
     icon: AlertTriangle,
-    className: "bg-orange-100 text-orange-800 border-orange-200",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
   },
   RED: {
-    label: "RED",
+    label: "High",
     icon: AlertCircle,
-    className: "bg-red-100 text-red-800 border-red-200",
+    className: "bg-red-50 text-red-700 border-red-200",
   },
 };
 

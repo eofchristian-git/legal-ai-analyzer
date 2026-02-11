@@ -21,7 +21,8 @@
       "Bash(powershell -Command \"Copy-Item ''node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node.tmp*'' ''node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node'' -Force -ErrorAction SilentlyContinue\")",
       "Bash(powershell:*)",
       "Bash(node -e:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

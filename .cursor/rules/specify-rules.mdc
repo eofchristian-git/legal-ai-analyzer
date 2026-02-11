@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-02-11
 
 ## Active Technologies
+- TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react, jspdf, react-markdown (002-contract-review-ux)
+- SQLite via Prisma ORM (`prisma/schema.prisma`) (002-contract-review-ux)
 
 - TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react (001-contract-review-findings)
 
@@ -23,6 +25,7 @@ npm test; npm run lint
 TypeScript 5.x (Next.js 16, App Router): Follow standard conventions
 
 ## Recent Changes
+- 002-contract-review-ux: Added TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react, jspdf, react-markdown
 
 - 001-contract-review-findings: Added TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react
 

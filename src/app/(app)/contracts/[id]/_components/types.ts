@@ -16,6 +16,7 @@ export interface Finding {
   summary: string;
   fallbackText: string;
   whyTriggered: string;
+  excerpt: string;
   triageDecision: TriageDecision | null;
   triageNote: string | null;
   triagedBy: string | null;
@@ -31,6 +32,15 @@ export interface Clause {
   clauseText: string;
   position: number;
   findings: Finding[];
+}
+
+export interface NegotiationItem {
+  id: string;
+  priority: string;   // "P1" | "P2" | "P3"
+  title: string;
+  description: string;
+  clauseRef: string | null;
+  position: number;
 }
 
 export interface AnalysisWithClauses {
@@ -50,6 +60,7 @@ export interface AnalysisWithClauses {
   currentPlaybookVersion: number | null;
   executiveSummary: string | null;
   negotiationStrategy: string | null;
+  negotiationItems: NegotiationItem[];
   modelUsed: string;
   createdAt: string;
   clauses: Clause[];

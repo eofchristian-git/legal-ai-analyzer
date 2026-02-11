@@ -34,6 +34,9 @@ export async function GET(
                 },
               },
             },
+            negotiationItems: {
+              orderBy: { position: "asc" as const },
+            },
             playbookSnapshot: {
               select: {
                 version: true,
@@ -52,6 +55,20 @@ export async function GET(
         { error: "Contract not found" },
         { status: 404 }
       );
+    }
+
+    // Auto-reset stale "analyzing" status — if more than 5 minutes have passed,
+    // the analysis process is likely dead (e.g., server restart)
+    const STALE_ANALYSIS_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    if (
+      contract.status === "analyzing" &&
+      Date.now() - new Date(contract.updatedAt).getTime() > STALE_ANALYSIS_TIMEOUT_MS
+    ) {
+      await db.contract.update({
+        where: { id },
+        data: { status: "error" },
+      });
+      contract.status = "error";
     }
 
     // Augment the response with resolved user names and playbook version info
