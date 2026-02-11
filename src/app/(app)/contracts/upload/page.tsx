@@ -91,9 +91,9 @@ export default function UploadContractPage() {
 
       const contract = await contractRes.json();
 
-      // Step 3: Navigate to detail page (analysis will be triggered there)
-      toast.success("Contract uploaded successfully");
-      router.push(`/contracts/${contract.id}`);
+      // Step 3: Navigate to detail page and auto-start analysis
+      toast.success("Contract uploaded — starting analysis…");
+      router.push(`/contracts/${contract.id}?autoAnalyze=true`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Something went wrong"

@@ -12,7 +12,38 @@ export async function GET(
       where: { id },
       include: {
         document: true,
-        analysis: true,
+        createdByUser: { select: { id: true, name: true } },
+        analysis: {
+          include: {
+            createdByUser: { select: { id: true, name: true } },
+            finalizedByUser: { select: { id: true, name: true } },
+            clauses: {
+              orderBy: { position: "asc" },
+              include: {
+                findings: {
+                  orderBy: { createdAt: "asc" },
+                  include: {
+                    triagedByUser: { select: { id: true, name: true } },
+                    comments: {
+                      orderBy: { createdAt: "asc" },
+                      include: {
+                        user: { select: { id: true, name: true, email: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            playbookSnapshot: {
+              select: {
+                version: true,
+                playbook: {
+                  select: { version: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -23,7 +54,42 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(contract);
+    // Augment the response with resolved user names and playbook version info
+    const response: Record<string, unknown> = {
+      ...contract,
+      createdByName: contract.createdByUser?.name ?? null,
+      createdByUser: undefined, // remove the nested object
+    };
+
+    if (contract.analysis) {
+      const snapshot = contract.analysis.playbookSnapshot;
+
+      // Flatten findings to include triagedByName
+      const augmentedClauses = contract.analysis.clauses.map((clause) => ({
+        ...clause,
+        findings: clause.findings.map((finding) => ({
+          ...finding,
+          triagedByName: finding.triagedByUser?.name ?? null,
+          triagedByUser: undefined, // remove nested object
+        })),
+      }));
+
+      const analysisResponse: Record<string, unknown> = {
+        ...contract.analysis,
+        playbookVersion: snapshot?.version ?? null,
+        currentPlaybookVersion: snapshot?.playbook?.version ?? null,
+        createdByName: contract.analysis.createdByUser?.name ?? null,
+        finalizedByName: contract.analysis.finalizedByUser?.name ?? null,
+        clauses: augmentedClauses,
+      };
+      // Remove nested objects from response
+      delete analysisResponse.playbookSnapshot;
+      delete analysisResponse.createdByUser;
+      delete analysisResponse.finalizedByUser;
+      response.analysis = analysisResponse;
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Failed to get contract:", error);
     return NextResponse.json(

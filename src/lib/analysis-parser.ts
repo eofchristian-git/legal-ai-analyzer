@@ -1,3 +1,5 @@
+// === Legacy interfaces (kept for backward compatibility) ===
+
 export interface ClauseAnalysis {
   clauseName: string;
   severity: "GREEN" | "YELLOW" | "RED";
@@ -15,59 +17,141 @@ export interface ContractAnalysisResult {
   rawAnalysis: string;
 }
 
-export function parseContractAnalysis(raw: string): ContractAnalysisResult {
-  const clauses: ClauseAnalysis[] = [];
+// === New structured types ===
 
-  // Match clause headers like "### Limitation of Liability -- RED"
-  const clauseRegex = /###\s+(.+?)\s*--\s*(GREEN|YELLOW|RED)/gi;
-  let match;
+export interface StructuredFinding {
+  riskLevel: "GREEN" | "YELLOW" | "RED";
+  matchedRuleTitle: string;
+  summary: string;
+  fallbackText: string;
+  whyTriggered: string;
+}
 
-  while ((match = clauseRegex.exec(raw)) !== null) {
-    const clauseName = match[1].trim();
-    const severity = match[2].toUpperCase() as "GREEN" | "YELLOW" | "RED";
+export interface StructuredClause {
+  clauseNumber: string;
+  clauseName: string;
+  clauseText: string;
+  position: number;
+  findings: StructuredFinding[];
+}
 
-    // Get content until next ### or ## header
-    const startIdx = match.index + match[0].length;
-    const nextHeader = raw.indexOf("\n##", startIdx);
-    const content =
-      nextHeader !== -1
-        ? raw.slice(startIdx, nextHeader).trim()
-        : raw.slice(startIdx).trim();
+export interface StructuredAnalysisResult {
+  executiveSummary: string;
+  overallRisk: string;
+  clauses: StructuredClause[];
+  negotiationStrategy: string;
+  greenCount: number;
+  yellowCount: number;
+  redCount: number;
+  rawAnalysis: string;
+}
 
-    clauses.push({ clauseName, severity, content });
+/**
+ * Parse the structured JSON response from Claude.
+ * Handles cases where Claude wraps the JSON in markdown code fences.
+ */
+export function parseContractAnalysis(raw: string): StructuredAnalysisResult {
+  // Strip markdown code fences if present
+  let jsonStr = raw.trim();
+  const codeFenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (codeFenceMatch) {
+    jsonStr = codeFenceMatch[1].trim();
   }
 
-  const greenCount = clauses.filter((c) => c.severity === "GREEN").length;
-  const yellowCount = clauses.filter((c) => c.severity === "YELLOW").length;
-  const redCount = clauses.filter((c) => c.severity === "RED").length;
+  let parsed: {
+    executiveSummary?: string;
+    overallRisk?: string;
+    clauses?: StructuredClause[];
+    negotiationStrategy?: string;
+  };
 
-  let overallRisk = "low";
-  if (redCount > 0) overallRisk = "high";
-  else if (yellowCount > 0) overallRisk = "medium";
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    // Fallback: try to find JSON object in the raw text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        // If all parsing fails, return an empty result
+        return {
+          executiveSummary: "",
+          overallRisk: "medium",
+          clauses: [],
+          negotiationStrategy: "",
+          greenCount: 0,
+          yellowCount: 0,
+          redCount: 0,
+          rawAnalysis: raw,
+        };
+      }
+    } else {
+      return {
+        executiveSummary: "",
+        overallRisk: "medium",
+        clauses: [],
+        negotiationStrategy: "",
+        greenCount: 0,
+        yellowCount: 0,
+        redCount: 0,
+        rawAnalysis: raw,
+      };
+    }
+  }
 
-  // Extract executive summary
-  const summaryMatch = raw.match(
-    /## Executive Summary\n([\s\S]*?)(?=\n## )/i
+  const clauses: StructuredClause[] = (parsed.clauses || []).map(
+    (clause, index) => ({
+      clauseNumber: clause.clauseNumber || "",
+      clauseName: clause.clauseName || `Clause ${index + 1}`,
+      clauseText: clause.clauseText || "",
+      position: clause.position || index + 1,
+      findings: (clause.findings || []).map((f) => ({
+        riskLevel: (["GREEN", "YELLOW", "RED"].includes(f.riskLevel)
+          ? f.riskLevel
+          : "YELLOW") as "GREEN" | "YELLOW" | "RED",
+        matchedRuleTitle: f.matchedRuleTitle || "Unknown Rule",
+        summary: f.summary || "",
+        fallbackText: f.fallbackText || "",
+        whyTriggered: f.whyTriggered || "",
+      })),
+    })
   );
-  const executiveSummary = summaryMatch ? summaryMatch[1].trim() : "";
 
-  // Extract negotiation strategy
-  const strategyMatch = raw.match(
-    /## Negotiation Strategy\n([\s\S]*?)(?=\n## |$)/i
-  );
-  const negotiationStrategy = strategyMatch ? strategyMatch[1].trim() : "";
+  // Count risk levels across all findings
+  let greenCount = 0;
+  let yellowCount = 0;
+  let redCount = 0;
+
+  for (const clause of clauses) {
+    for (const finding of clause.findings) {
+      if (finding.riskLevel === "GREEN") greenCount++;
+      else if (finding.riskLevel === "YELLOW") yellowCount++;
+      else if (finding.riskLevel === "RED") redCount++;
+    }
+  }
+
+  // Determine overall risk
+  let overallRisk = parsed.overallRisk || "low";
+  if (!["low", "medium", "high"].includes(overallRisk)) {
+    if (redCount > 0) overallRisk = "high";
+    else if (yellowCount > 0) overallRisk = "medium";
+    else overallRisk = "low";
+  }
 
   return {
+    executiveSummary: parsed.executiveSummary || "",
     overallRisk,
+    clauses,
+    negotiationStrategy: parsed.negotiationStrategy || "",
     greenCount,
     yellowCount,
     redCount,
-    clauses,
-    executiveSummary,
-    negotiationStrategy,
     rawAnalysis: raw,
   };
 }
+
+// === Unchanged parsers below ===
 
 export interface NdaTriageResult {
   classification: "GREEN" | "YELLOW" | "RED";
@@ -76,7 +160,6 @@ export interface NdaTriageResult {
 }
 
 export function parseNdaTriage(raw: string): NdaTriageResult {
-  // Extract classification
   const classMatch = raw.match(
     /## Classification:\s*(GREEN|YELLOW|RED)/i
   );
@@ -85,7 +168,6 @@ export function parseNdaTriage(raw: string): NdaTriageResult {
     | "YELLOW"
     | "RED";
 
-  // Extract recommendation
   const recMatch = raw.match(
     /## Recommendation\n([\s\S]*?)(?=\n## |$)/i
   );
@@ -103,11 +185,9 @@ export interface RiskAssessmentResult {
 }
 
 export function parseRiskAssessment(raw: string): RiskAssessmentResult {
-  // Extract severity
   const sevMatch = raw.match(/## Severity:\s*(\d)/i);
   const severity = sevMatch ? parseInt(sevMatch[1]) : 3;
 
-  // Extract likelihood
   const likMatch = raw.match(/## Likelihood:\s*(\d)/i);
   const likelihood = likMatch ? parseInt(likMatch[1]) : 3;
 

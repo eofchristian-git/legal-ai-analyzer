@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getSessionOrUnauthorized } from "@/lib/auth-utils";
 
 export async function GET() {
   try {
@@ -13,15 +14,44 @@ export async function GET() {
             greenCount: true,
             yellowCount: true,
             redCount: true,
+            finalized: true,
             executiveSummary: true,
             createdAt: true,
+            clauses: {
+              select: {
+                findings: {
+                  select: {
+                    id: true,
+                    triageDecision: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(contracts);
+    // Augment contracts with triage summary
+    const augmented = contracts.map((contract) => {
+      if (!contract.analysis) return contract;
+
+      const allFindings = contract.analysis.clauses.flatMap((c) => c.findings);
+      const triagedCount = allFindings.filter((f) => f.triageDecision).length;
+
+      return {
+        ...contract,
+        analysis: {
+          ...contract.analysis,
+          totalFindings: allFindings.length,
+          triagedCount,
+          clauses: undefined, // Remove the nested clauses from list response
+        },
+      };
+    });
+
+    return NextResponse.json(augmented);
   } catch (error) {
     console.error("Failed to list contracts:", error);
     return NextResponse.json(
@@ -33,6 +63,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const { session } = await getSessionOrUnauthorized();
+    const userId = session?.user?.id ?? null;
+
     const body = await req.json();
 
     const { documentId, title, ourSide, contractType, counterparty, deadline, focusAreas, dealContext } = body;
@@ -67,11 +100,24 @@ export async function POST(req: NextRequest) {
         focusAreas: focusAreas || null,
         dealContext: dealContext || null,
         status: "pending",
+        createdBy: userId,
       },
       include: {
         document: true,
       },
     });
+
+    // Write activity log
+    if (userId) {
+      await db.activityLog.create({
+        data: {
+          contractId: contract.id,
+          action: "contract_created",
+          userId,
+          metadata: JSON.stringify({ title }),
+        },
+      });
+    }
 
     return NextResponse.json(contract, { status: 201 });
   } catch (error) {

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { SeverityBadge } from "@/components/shared/severity-badge";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Lock } from "lucide-react";
 
 interface ContractRow {
   id: string;
@@ -28,6 +28,9 @@ interface ContractRow {
     greenCount: number;
     yellowCount: number;
     redCount: number;
+    finalized: boolean;
+    totalFindings: number;
+    triagedCount: number;
   };
 }
 
@@ -78,6 +81,7 @@ export default function ContractsPage() {
                 <TableHead>Our Side</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Findings</TableHead>
+                <TableHead>Triage</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
             </TableHeader>
@@ -124,6 +128,20 @@ export default function ContractsPage() {
                           <SeverityBadge severity="GREEN" size="sm" />
                         )}
                       </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {contract.analysis && (
+                      contract.analysis.finalized ? (
+                        <Badge variant="outline" className="gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                          <Lock className="h-3 w-3" />
+                          Finalized
+                        </Badge>
+                      ) : contract.analysis.totalFindings > 0 ? (
+                        <span className="text-xs text-muted-foreground">
+                          {contract.analysis.triagedCount}/{contract.analysis.totalFindings} triaged
+                        </span>
+                      ) : null
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
