@@ -7,6 +7,7 @@ export async function GET() {
     const contracts = await db.contract.findMany({
       include: {
         document: true,
+        createdByUser: { select: { id: true, name: true } },
         analysis: {
           select: {
             id: true,
@@ -35,13 +36,19 @@ export async function GET() {
 
     // Augment contracts with triage summary
     const augmented = contracts.map((contract: any) => {
-      if (!contract.analysis) return contract;
+      if (!contract.analysis) return {
+        ...contract,
+        createdByName: contract.createdByUser?.name ?? null,
+        createdByUser: undefined,
+      };
 
       const allFindings = contract.analysis.clauses.flatMap((c: any) => c.findings);
       const triagedCount = allFindings.filter((f: any) => f.triageDecision).length;
 
       return {
         ...contract,
+        createdByName: contract.createdByUser?.name ?? null,
+        createdByUser: undefined,
         analysis: {
           ...contract.analysis,
           totalFindings: allFindings.length,

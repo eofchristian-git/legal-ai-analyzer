@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,7 @@ export default function ContractDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { data: session } = useSession();
   const [contract, setContract] = useState<ContractWithAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -203,6 +205,7 @@ export default function ContractDetailPage() {
                       triageDecision: decision,
                       triageNote: note || f.triageNote,
                       triagedAt: new Date().toISOString(),
+                      triagedByName: session?.user?.name ?? f.triagedByName,
                     }
                   : f
               ),

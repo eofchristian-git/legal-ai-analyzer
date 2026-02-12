@@ -135,6 +135,12 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
             const maxRisk = getMaxRisk(clause.findings);
             const isSelected = selectedClauseId === clause.id;
             const findingCount = clause.findings.length;
+            const triagedFindings = clause.findings.filter((f) => f.triageDecision);
+            const triagedByUsers = [...new Set(
+              triagedFindings
+                .map((f) => f.triagedByName)
+                .filter(Boolean)
+            )];
             return (
               <button
                 key={clause.id}
@@ -154,16 +160,23 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                   )}>
                     {clause.clauseNumber ? `§${clause.clauseNumber}` : clause.clauseName}
                   </span>
-                  {findingCount > 0 && (
-                    <span className={cn(
-                      "text-xs font-medium px-2.5 py-0.5 rounded-full border",
-                      maxRisk === "RED" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
-                      maxRisk === "YELLOW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
-                      "bg-risk-green-soft text-risk-green border-risk-green-border"
-                    )}>
-                      {riskLabel[maxRisk]}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {findingCount > 0 && (
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {findingCount}
+                      </span>
+                    )}
+                    {findingCount > 0 && (
+                      <span className={cn(
+                        "text-xs font-medium px-2.5 py-0.5 rounded-full border",
+                        maxRisk === "RED" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
+                        maxRisk === "YELLOW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
+                        "bg-risk-green-soft text-risk-green border-risk-green-border"
+                      )}>
+                        {riskLabel[maxRisk]}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {clause.clauseNumber && (
                   <p className={cn(
@@ -171,6 +184,17 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                     isSelected ? "text-foreground/70" : "text-muted-foreground/60"
                   )}>
                     {clause.clauseName}
+                  </p>
+                )}
+                {triagedFindings.length > 0 && (
+                  <p className={cn(
+                    "text-[10px] mt-0.5 truncate",
+                    isSelected ? "text-foreground/60" : "text-muted-foreground/50"
+                  )}>
+                    {triagedFindings.length}/{findingCount}
+                    {triagedByUsers.length > 0 && (
+                      <span> by {triagedByUsers.join(", ")}</span>
+                    )}
                   </p>
                 )}
               </button>

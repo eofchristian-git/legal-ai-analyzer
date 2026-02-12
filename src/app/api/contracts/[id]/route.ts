@@ -116,6 +116,54 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+
+    const contract = await db.contract.findUnique({
+      where: { id },
+    });
+
+    if (!contract) {
+      return NextResponse.json(
+        { error: "Contract not found" },
+        { status: 404 }
+      );
+    }
+
+    const allowedFields: Record<string, unknown> = {};
+    if (body.title !== undefined) allowedFields.title = body.title;
+    if (body.ourSide !== undefined) allowedFields.ourSide = body.ourSide;
+    if (body.contractType !== undefined) allowedFields.contractType = body.contractType || null;
+    if (body.counterparty !== undefined) allowedFields.counterparty = body.counterparty || null;
+
+    if (Object.keys(allowedFields).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields to update" },
+        { status: 400 }
+      );
+    }
+
+    const updated = await db.contract.update({
+      where: { id },
+      data: allowedFields,
+      include: { document: true },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Failed to update contract:", error);
+    return NextResponse.json(
+      { error: "Failed to update contract" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

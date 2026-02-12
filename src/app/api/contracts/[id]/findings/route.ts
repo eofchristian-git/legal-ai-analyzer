@@ -106,6 +106,7 @@ export async function PATCH(
             triageNote: true,
             triagedBy: true,
             triagedAt: true,
+            triagedByUser: { select: { name: true } },
           },
         })
     );
