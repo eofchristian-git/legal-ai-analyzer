@@ -82,9 +82,9 @@ export async function GET(
       const snapshot = contract.analysis.playbookSnapshot;
 
       // Flatten findings to include triagedByName
-      const augmentedClauses = contract.analysis.clauses.map((clause) => ({
+      const augmentedClauses = contract.analysis.clauses.map((clause: any) => ({
         ...clause,
-        findings: clause.findings.map((finding) => ({
+        findings: clause.findings.map((finding: any) => ({
           ...finding,
           triagedByName: finding.triagedByUser?.name ?? null,
           triagedByUser: undefined, // remove nested object

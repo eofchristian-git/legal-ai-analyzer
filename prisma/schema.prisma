@@ -212,9 +212,10 @@ model AnalysisClause {
   analysisId   String
   analysis     ContractAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   clauseNumber String           @default("")
-  clauseName   String
-  clauseText   String
-  position     Int
+  clauseName          String
+  clauseText          String
+  clauseTextFormatted String?
+  position            Int
   createdAt    DateTime         @default(now())
 
   findings AnalysisFinding[]

@@ -2,36 +2,38 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SeverityBadge } from "@/components/shared/severity-badge";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  BookOpen,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
   ChevronDown,
-  Search,
+  CircleCheck,
   MessageSquare,
+  Swords,
+  Search,
   Send,
   Loader2,
-  Lock,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { TriageControls } from "./triage-controls";
-import type { Clause, Finding, FindingComment, TriageDecision } from "./types";
+import { MarkdownViewer } from "@/components/shared/markdown-viewer";
+import type { Clause, Finding, FindingComment, NegotiationItem, TriageDecision } from "./types";
 
 interface FindingsPanelProps {
   clause: Clause | null;
   finalized: boolean;
   contractId: string;
+  executiveSummary?: string | null;
+  negotiationItems?: NegotiationItem[];
   onTriageDecision: (
     findingId: string,
     decision: TriageDecision,
@@ -42,40 +44,30 @@ interface FindingsPanelProps {
 
 const severityOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
 
-const riskBorderColors: Record<string, string> = {
-  RED: "border-l-red-400",
-  YELLOW: "border-l-amber-400",
-  GREEN: "border-l-emerald-400",
+const riskIcon = {
+  RED: AlertCircle,
+  YELLOW: AlertTriangle,
+  GREEN: CheckCircle2,
 };
 
-const triageBannerConfig: Record<
-  string,
-  { label: string; className: string; icon: typeof CheckCircle2 }
-> = {
-  accept: {
-    label: "Accepted",
-    className: "bg-emerald-50 border-emerald-200 text-emerald-700",
-    icon: CheckCircle2,
-  },
-  needs_review: {
-    label: "Needs Review",
-    className: "bg-amber-50 border-amber-200 text-amber-700",
-    icon: AlertTriangle,
-  },
-  reject: {
-    label: "Rejected",
-    className: "bg-red-50 border-red-200 text-red-700",
-    icon: XCircle,
-  },
+const riskLabel: Record<string, string> = {
+  RED: "High",
+  YELLOW: "Medium",
+  GREEN: "Low",
 };
 
 export function FindingsPanel({
   clause,
   finalized,
   contractId,
+  executiveSummary,
+  negotiationItems = [],
   onTriageDecision,
   onCommentAdded,
 }: FindingsPanelProps) {
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(false);
+
   // Sort findings by severity: RED → YELLOW → GREEN
   const sortedFindings = useMemo(() => {
     if (!clause) return [];
@@ -103,32 +95,84 @@ export function FindingsPanel({
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {clause.findings.length} finding
-            {clause.findings.length !== 1 ? "s" : ""}
-          </p>
-          {finalized && (
-            <span className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Lock className="h-3 w-3" />
-              Finalized
-            </span>
-          )}
-        </div>
-        {sortedFindings.map((finding) => (
-          <FindingCard
-            key={finding.id}
-            finding={finding}
-            finalized={finalized}
-            contractId={contractId}
-            onTriageDecision={onTriageDecision}
-            onCommentAdded={onCommentAdded}
-          />
-        ))}
+    <div className="h-full flex flex-col bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b shrink-0">
+        <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
+          Findings & Triage
+        </p>
       </div>
-    </ScrollArea>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-4 space-y-3">
+          {/* Executive Summary collapsible */}
+          {executiveSummary && (
+            <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-2 w-full text-left text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider py-1">
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", summaryOpen && "rotate-180")} />
+                  Executive Summary
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-2 p-3 rounded-md bg-muted/50 border text-xs">
+                  <MarkdownViewer content={executiveSummary} />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Negotiation Strategy collapsible */}
+          {negotiationItems.length > 0 && (
+            <Collapsible open={strategyOpen} onOpenChange={setStrategyOpen}>
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-2 w-full text-left text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider py-1">
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", strategyOpen && "rotate-180")} />
+                  <Swords className="h-3 w-3" />
+                  Strategy ({negotiationItems.length})
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-2 space-y-1.5">
+                  {negotiationItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/50 border text-xs">
+                      <Badge variant="outline" className={cn(
+                        "shrink-0 text-xs px-2 py-0.5",
+                        item.priority === "P1" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
+                        item.priority === "P2" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
+                        "bg-risk-info-soft text-risk-info border-risk-info-border"
+                      )}>
+                        {item.priority}
+                      </Badge>
+                      <div>
+                        <p className="font-medium text-foreground">{item.title}</p>
+                        <p className="text-muted-foreground mt-0.5">{item.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          <Separator />
+
+          {/* Current clause findings */}
+          <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
+            {clause.clauseName} — {clause.findings.length} finding{clause.findings.length !== 1 ? "s" : ""}
+          </p>
+
+          {sortedFindings.map((finding) => (
+            <FindingCard
+              key={finding.id}
+              finding={finding}
+              finalized={finalized}
+              contractId={contractId}
+              onTriageDecision={onTriageDecision}
+              onCommentAdded={onCommentAdded}
+            />
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -149,11 +193,11 @@ function FindingCard({
   ) => void;
   onCommentAdded?: (findingId: string, comment: FindingComment) => void;
 }) {
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [addingComment, setAddingComment] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
 
-  const borderColor = riskBorderColors[finding.riskLevel] || "border-l-slate-300";
+  const Icon = riskIcon[finding.riskLevel as keyof typeof riskIcon] ?? AlertCircle;
 
   const handlePostComment = useCallback(async () => {
     if (!commentText.trim()) return;
@@ -176,6 +220,7 @@ function FindingCard({
 
       const comment = await res.json();
       setCommentText("");
+      setAddingComment(false);
       onCommentAdded?.(finding.id, comment);
       toast.success("Comment posted");
     } catch {
@@ -185,176 +230,142 @@ function FindingCard({
     }
   }, [commentText, contractId, finding.id, onCommentAdded]);
 
-  const formatTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHrs = Math.floor(diffMins / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    const diffDays = Math.floor(diffHrs / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString();
-  };
-
-  // Triage decision banner
-  const triageBanner = finding.triageDecision
-    ? triageBannerConfig[finding.triageDecision]
-    : null;
-  const TriageBannerIcon = triageBanner?.icon;
-
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card space-y-0 overflow-hidden",
-        "border-l-[3px]",
-        borderColor,
+        "rounded-lg border-l-[3px] bg-card p-3 space-y-2 shadow-sm border border-border",
+        finding.riskLevel === "RED" ? "border-l-risk-red" :
+        finding.riskLevel === "YELLOW" ? "border-l-risk-yellow" : "border-l-risk-green",
         finalized && "opacity-70"
       )}
     >
-      {/* Triage Decision Banner (prominent, full-width) */}
-      {triageBanner && (
-        <div
-          className={cn(
-            "flex items-center gap-2 px-3 py-1.5 border-b text-xs font-medium",
-            triageBanner.className
-          )}
-        >
-          {TriageBannerIcon && <TriageBannerIcon className="h-3.5 w-3.5" />}
-          <span>{triageBanner.label}</span>
-          {finding.triagedByName && (
-            <span className="ml-auto text-[11px] font-normal opacity-80">
-              by {finding.triagedByName}
-              {finding.triagedAt && ` · ${formatTime(finding.triagedAt)}`}
-            </span>
-          )}
-          {finalized && <Lock className="h-3 w-3 ml-1 opacity-50" />}
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon className={cn(
+            "h-4 w-4 shrink-0",
+            finding.riskLevel === "RED" ? "text-risk-red" :
+            finding.riskLevel === "YELLOW" ? "text-risk-yellow" : "text-risk-green"
+          )} />
+          <Badge variant="outline" className={cn(
+            "text-xs px-2 py-0.5",
+            finding.riskLevel === "RED" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
+            finding.riskLevel === "YELLOW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
+            "bg-risk-green-soft text-risk-green border-risk-green-border"
+          )}>
+            {riskLabel[finding.riskLevel] ?? finding.riskLevel}
+          </Badge>
+        </div>
+        {finding.triageDecision && (
+          <Badge variant="outline" className={cn(
+            "text-[11px] shrink-0 px-2 py-0.5",
+            finding.triageDecision === "ACCEPT" ? "bg-risk-green-soft text-risk-green border-risk-green-border" :
+            finding.triageDecision === "NEEDS_REVIEW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
+            "bg-risk-red-soft text-risk-red border-risk-red-border"
+          )}>
+            <CircleCheck className="h-3 w-3 mr-0.5" />
+            {finding.triageDecision === "ACCEPT" ? "accept" :
+             finding.triageDecision === "NEEDS_REVIEW" ? "negotiate" : "escalate"}
+          </Badge>
+        )}
+      </div>
+
+      {/* Rule + Summary */}
+      <div>
+        <p className="text-[10px] text-muted-foreground">{finding.matchedRuleTitle}</p>
+        <p className="text-xs font-medium text-foreground mt-0.5">{finding.summary}</p>
+      </div>
+
+      {/* Excerpt */}
+      {finding.excerpt && (
+        <blockquote className={cn(
+          "border-l-2 pl-2.5 text-[11px] text-muted-foreground italic",
+          finding.riskLevel === "RED" ? "border-l-risk-red" :
+          finding.riskLevel === "YELLOW" ? "border-l-risk-yellow" : "border-l-risk-green"
+        )}>
+          &ldquo;{finding.excerpt}&rdquo;
+        </blockquote>
+      )}
+
+      {/* Fallback */}
+      {finding.fallbackText && (
+        <p className="border-l-2 border-l-risk-green pl-2.5 text-[11px] text-muted-foreground">{finding.fallbackText}</p>
+      )}
+
+      {/* Triage Buttons */}
+      {!finding.triageDecision && !finalized && (
+        <div className="flex gap-1.5 pt-1">
+          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "ACCEPT")}>
+            Accept
+          </Button>
+          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "NEEDS_REVIEW")}>
+            Negotiate
+          </Button>
+          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "REJECT")}>
+            Escalate
+          </Button>
         </div>
       )}
 
-      <div className="p-3 space-y-2.5">
-        {/* Header: risk badge + summary */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{finding.summary}</p>
-          </div>
-          <SeverityBadge severity={finding.riskLevel} size="sm" />
-        </div>
-
-        {/* Matched Playbook Rule */}
-        <div className="flex items-center gap-1.5">
-          <Badge
-            variant="outline"
-            className="gap-1 text-[11px] font-normal text-muted-foreground shrink-0"
-          >
-            <BookOpen className="h-3 w-3" />
-            Playbook Rule
-          </Badge>
-          <span className="text-xs font-medium truncate">
-            {finding.matchedRuleTitle}
-          </span>
-        </div>
-
-        {/* Why Triggered */}
-        <div className="rounded bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground/70">
-            Why triggered:{" "}
-          </span>
-          {finding.whyTriggered}
-        </div>
-
-        {/* Recommended Language */}
-        {finding.fallbackText && (
-          <div>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
-              Recommended Language
-            </p>
-            <div className="rounded bg-primary/5 border border-primary/10 px-2.5 py-2 text-xs text-foreground/80 whitespace-pre-wrap">
-              {finding.fallbackText}
+      {/* Comments */}
+      {finding.comments.length > 0 && (
+        <div className="border-t pt-2 mt-1 space-y-1">
+          {finding.comments.map((c) => (
+            <div key={c.id} className="flex items-start gap-1.5 text-[11px]">
+              <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+              <span>
+                <span className="font-medium text-foreground">{c.user.name}</span>{" "}
+                <span className="text-muted-foreground">{c.content}</span>
+              </span>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {/* Triage Controls — hidden when finalized */}
-        {!finalized && (
-          <TriageControls
-            findingId={finding.id}
-            currentDecision={finding.triageDecision}
-            currentNote={finding.triageNote}
-            disabled={finalized}
-            onDecision={onTriageDecision}
+      {/* Add comment */}
+      {!addingComment ? (
+        <button
+          onClick={() => setAddingComment(true)}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <MessageSquare className="h-3 w-3" />
+          Add comment
+        </button>
+      ) : (
+        <div className="flex gap-1.5 pt-1">
+          <Textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Add a comment..."
+            className="min-h-[60px] text-xs resize-none"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                handlePostComment();
+              }
+              if (e.key === "Escape") {
+                setAddingComment(false);
+                setCommentText("");
+              }
+            }}
           />
-        )}
-
-        {/* Comments section */}
-        <Collapsible open={commentsOpen} onOpenChange={setCommentsOpen}>
-          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-            <MessageSquare className="h-3 w-3" />
-            {finding.comments.length > 0
-              ? `${finding.comments.length} comment${finding.comments.length !== 1 ? "s" : ""}`
-              : "Add comment"}
-            <ChevronDown
-              className={cn(
-                "h-3 w-3 transition-transform",
-                commentsOpen && "rotate-180"
+          <div className="flex flex-col gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="shrink-0 h-7 w-7"
+              disabled={!commentText.trim() || posting}
+              onClick={handlePostComment}
+            >
+              {posting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
               )}
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-2 space-y-2">
-              {/* Existing comments */}
-              {finding.comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="rounded bg-muted/40 px-2.5 py-2 text-xs"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-foreground/80">
-                      {comment.user.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatTime(comment.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {comment.content}
-                  </p>
-                </div>
-              ))}
-
-              {/* New comment input */}
-              <div className="flex gap-1.5">
-                <Textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="min-h-[60px] text-xs resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                      handlePostComment();
-                    }
-                  }}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="shrink-0 h-8 w-8 self-end"
-                  disabled={!commentText.trim() || posting}
-                  onClick={handlePostComment}
-                >
-                  {posting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

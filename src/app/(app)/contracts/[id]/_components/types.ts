@@ -30,6 +30,7 @@ export interface Clause {
   clauseNumber: string;
   clauseName: string;
   clauseText: string;
+  clauseTextFormatted?: string;
   position: number;
   findings: Finding[];
 }

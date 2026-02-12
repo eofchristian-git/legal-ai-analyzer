@@ -83,7 +83,7 @@ export async function PATCH(
 
     // Build a map of findingId -> clauseName for audit metadata
     const findingClauseMap = Object.fromEntries(
-      findings.map((f) => [f.id, { clauseName: f.clause.clauseName, summary: f.summary }])
+      findings.map((f: any) => [f.id, { clauseName: f.clause.clauseName, summary: f.summary }])
     );
 
     // Update all findings in a transaction

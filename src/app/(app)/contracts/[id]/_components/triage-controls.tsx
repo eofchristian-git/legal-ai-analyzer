@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Check, AlertTriangle, X } from "lucide-react";
 import type { TriageDecision } from "./types";
 
 interface TriageControlsProps {
@@ -19,85 +16,62 @@ interface TriageControlsProps {
   ) => void;
 }
 
-const decisionConfig = {
+const decisionConfig: Record<
+  TriageDecision,
+  { label: string; activeClass: string }
+> = {
   ACCEPT: {
     label: "Accept",
-    icon: Check,
-    activeClass: "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200",
-    inactiveClass: "hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200",
+    activeClass:
+      "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100",
   },
   NEEDS_REVIEW: {
-    label: "Needs Review",
-    icon: AlertTriangle,
-    activeClass: "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-    inactiveClass: "hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200",
+    label: "Negotiate",
+    activeClass:
+      "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100",
   },
   REJECT: {
-    label: "Reject",
-    icon: X,
-    activeClass: "bg-red-100 text-red-800 border-red-300 hover:bg-red-200",
-    inactiveClass: "hover:bg-red-50 hover:text-red-700 hover:border-red-200",
+    label: "Escalate",
+    activeClass:
+      "bg-red-50 text-red-700 border-red-300 hover:bg-red-100",
   },
 };
 
 export function TriageControls({
   findingId,
   currentDecision,
-  currentNote,
   disabled,
   onDecision,
 }: TriageControlsProps) {
-  const [note, setNote] = useState(currentNote || "");
-
   function handleDecision(decision: TriageDecision) {
     if (disabled) return;
-    onDecision(findingId, decision, note || undefined);
-  }
-
-  function handleNoteBlur() {
-    if (currentDecision && note !== (currentNote || "")) {
-      onDecision(findingId, currentDecision, note || undefined);
-    }
+    onDecision(findingId, decision);
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex gap-1.5">
-        {(Object.keys(decisionConfig) as TriageDecision[]).map((decision) => {
-          const config = decisionConfig[decision];
-          const Icon = config.icon;
-          const isActive = currentDecision === decision;
+    <div className="flex gap-2 pt-1">
+      {(Object.keys(decisionConfig) as TriageDecision[]).map((decision) => {
+        const config = decisionConfig[decision];
+        const isActive = currentDecision === decision;
 
-          return (
-            <Button
-              key={decision}
-              variant="outline"
-              size="xs"
-              disabled={disabled}
-              onClick={() => handleDecision(decision)}
-              className={cn(
-                "flex-1 gap-1",
-                isActive ? config.activeClass : config.inactiveClass
-              )}
-            >
-              <Icon className="h-3 w-3" />
-              {config.label}
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Note input — shown after a triage decision is made */}
-      {currentDecision && (
-        <Input
-          placeholder="Optional triage note..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={handleNoteBlur}
-          disabled={disabled}
-          className="text-xs h-7"
-        />
-      )}
+        return (
+          <Button
+            key={decision}
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            onClick={() => handleDecision(decision)}
+            className={cn(
+              "h-7 px-3 text-xs font-medium rounded-md",
+              isActive
+                ? config.activeClass
+                : "text-foreground/70 hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            {config.label}
+          </Button>
+        );
+      })}
     </div>
   );
 }

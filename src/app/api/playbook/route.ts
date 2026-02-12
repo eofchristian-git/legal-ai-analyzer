@@ -50,14 +50,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Get creator names for rules
-    const userIds = [...new Set(rules.map((r) => r.createdBy))];
+    const userIds = [...new Set(rules.map((r: any) => r.createdBy))];
     const users = await db.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true },
     });
-    const userMap = Object.fromEntries(users.map((u) => [u.id, u.name]));
+    const userMap = Object.fromEntries(users.map((u: any) => [u.id, u.name]));
 
-    const rulesWithNames = rules.map((rule) => ({
+    const rulesWithNames = rules.map((rule: any) => ({
       ...rule,
       createdByName: userMap[rule.createdBy] || "Unknown",
     }));

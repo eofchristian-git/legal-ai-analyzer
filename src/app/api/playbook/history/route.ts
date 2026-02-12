@@ -11,14 +11,14 @@ export async function GET() {
     });
 
     // Get user names for createdBy
-    const userIds = [...new Set(snapshots.map((s) => s.createdBy))];
+    const userIds = [...new Set(snapshots.map((s: any) => s.createdBy))];
     const users = await db.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true },
     });
-    const userMap = Object.fromEntries(users.map((u) => [u.id, u.name]));
+    const userMap = Object.fromEntries(users.map((u: any) => [u.id, u.name]));
 
-    const result = snapshots.map((s) => ({
+    const result = snapshots.map((s: any) => ({
       id: s.id,
       version: s.version,
       createdBy: s.createdBy,

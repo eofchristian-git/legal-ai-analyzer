@@ -73,7 +73,7 @@ async function runAnalysis(id: string, userId: string | null) {
         });
         if (rulesWithGroups.length > 0) {
           await db.playbookSnapshotRule.createMany({
-            data: rulesWithGroups.map((rule) => ({
+            data: rulesWithGroups.map((rule: any) => ({
               snapshotId: snapshot.id,
               title: rule.title,
               description: rule.description,
@@ -104,7 +104,7 @@ async function runAnalysis(id: string, userId: string | null) {
     // Call Claude (non-streaming) and wait for the full response
     let fullResponse: string;
     try {
-      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384, prefill: "{" });
+      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384 });
     } catch (claudeErr) {
       console.error("Claude API error:", claudeErr);
       await db.contract.update({
@@ -180,7 +180,7 @@ async function runAnalysis(id: string, userId: string | null) {
       : [];
 
     // Save the analysis and nested clauses/findings in a single transaction
-    await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx: any) => {
       const analysis = await tx.contractAnalysis.create({
         data: {
           contractId: id,
@@ -213,6 +213,7 @@ async function runAnalysis(id: string, userId: string | null) {
             clauseNumber: clause.clauseNumber || "",
             clauseName: clause.clauseName,
             clauseText: clause.clauseText,
+            clauseTextFormatted: clause.clauseTextFormatted || null,
             position: clause.position,
           },
         });
@@ -220,7 +221,7 @@ async function runAnalysis(id: string, userId: string | null) {
         for (const finding of clause.findings) {
           // Fuzzy-match the rule title to resolve the snapshot rule ID
           const matchedRule = snapshotRules.find(
-            (r) =>
+            (r: any) =>
               r.title.toLowerCase() === finding.matchedRuleTitle.toLowerCase()
           );
 

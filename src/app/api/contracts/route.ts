@@ -34,11 +34,11 @@ export async function GET() {
     });
 
     // Augment contracts with triage summary
-    const augmented = contracts.map((contract) => {
+    const augmented = contracts.map((contract: any) => {
       if (!contract.analysis) return contract;
 
-      const allFindings = contract.analysis.clauses.flatMap((c) => c.findings);
-      const triagedCount = allFindings.filter((f) => f.triageDecision).length;
+      const allFindings = contract.analysis.clauses.flatMap((c: any) => c.findings);
+      const triagedCount = allFindings.filter((f: any) => f.triageDecision).length;
 
       return {
         ...contract,

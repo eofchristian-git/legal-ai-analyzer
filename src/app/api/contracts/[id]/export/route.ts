@@ -57,10 +57,10 @@ export async function GET(
     const analysis = contract.analysis;
     const sanitizedTitle = contract.title.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-");
 
-    const exportClauses = analysis.clauses.map((clause) => ({
+    const exportClauses = analysis.clauses.map((clause: any) => ({
       clauseName: clause.clauseName,
       position: clause.position,
-      findings: clause.findings.map((f) => ({
+      findings: clause.findings.map((f: any) => ({
         riskLevel: f.riskLevel,
         matchedRuleTitle: f.matchedRuleTitle,
         summary: f.summary,

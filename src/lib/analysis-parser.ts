@@ -39,6 +39,7 @@ export interface StructuredClause {
   clauseNumber: string;
   clauseName: string;
   clauseText: string;
+  clauseTextFormatted: string;
   position: number;
   findings: StructuredFinding[];
 }
@@ -176,30 +177,20 @@ function repairTruncatedJson(json: string): string {
  * Also handles truncated responses by attempting JSON repair.
  */
 export function parseContractAnalysis(raw: string): StructuredAnalysisResult {
+  // Strip markdown code fences if present
   let jsonStr = raw.trim();
 
-  // --- Step 1: Strip markdown code fences (line-based, handles backticks in content) ---
-  if (jsonStr.startsWith('```')) {
-    const firstNewline = jsonStr.indexOf('\n');
-    if (firstNewline !== -1) {
-      jsonStr = jsonStr.substring(firstNewline + 1);
+  // Try both greedy (complete) and lazy (incomplete/truncated) code fence patterns
+  const completeFenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (completeFenceMatch) {
+    jsonStr = completeFenceMatch[1].trim();
+  } else {
+    // Handle truncated response where closing ``` is missing
+    const openFenceMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*)/);
+    if (openFenceMatch) {
+      jsonStr = openFenceMatch[1].trim();
     }
   }
-  if (jsonStr.trimEnd().endsWith('```')) {
-    const lastFenceIdx = jsonStr.lastIndexOf('```');
-    jsonStr = jsonStr.substring(0, lastFenceIdx);
-  }
-  jsonStr = jsonStr.trim();
-
-  // --- Step 2: Extract the outermost JSON object (first '{' to last '}') ---
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-  }
-
-  // --- Step 3: Sanitize control characters from PDF-extracted text ---
-  jsonStr = sanitizeJsonString(jsonStr);
 
   let parsed: {
     executiveSummary?: string;
@@ -208,72 +199,99 @@ export function parseContractAnalysis(raw: string): StructuredAnalysisResult {
     negotiationStrategy?: string | StructuredNegotiationItem[];
   };
 
-  const EMPTY_RESULT: StructuredAnalysisResult = {
-    executiveSummary: "",
-    overallRisk: "medium",
-    clauses: [],
-    negotiationStrategy: "",
-    negotiationItems: [],
-    greenCount: 0,
-    yellowCount: 0,
-    redCount: 0,
-    rawAnalysis: raw,
-  };
+  // Sanitize control characters that PDF extraction may introduce
+  jsonStr = sanitizeJsonString(jsonStr);
 
-  // --- Step 4: Multi-attempt parsing ---
-  // Attempt 1: direct parse
   try {
     parsed = JSON.parse(jsonStr);
   } catch (err) {
     console.warn(`[Parser] Attempt 1 (direct parse) failed:`, err instanceof Error ? err.message : err);
-
-    // Attempt 2: extract from the unsanitized raw (first { to last })
+    // Fallback 1: try to find a complete JSON object in the raw text
     const sanitizedRaw = sanitizeJsonString(raw);
-    const rawFirst = sanitizedRaw.indexOf('{');
-    const rawLast = sanitizedRaw.lastIndexOf('}');
-    const extracted = rawFirst !== -1 && rawLast > rawFirst
-      ? sanitizedRaw.substring(rawFirst, rawLast + 1)
-      : null;
-
-    if (extracted) {
+    const jsonMatch = sanitizedRaw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
       try {
-        parsed = JSON.parse(extracted);
-      } catch (err2) {
-        console.warn(`[Parser] Attempt 2 (brace extraction) failed:`, err2 instanceof Error ? err2.message : err2);
-
-        // Attempt 3: repair the extracted substring (handles truncation)
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (err) {
+        console.warn(`[Parser] Attempt 2 (regex match) failed:`, err instanceof Error ? err.message : err);
+        // Fallback 2: attempt to repair truncated JSON
         try {
-          parsed = JSON.parse(repairTruncatedJson(extracted));
-          console.warn(`[Parser] Repaired truncated JSON. Raw length: ${raw.length}`);
-        } catch (err3) {
-          console.warn(`[Parser] Attempt 3 (repair extracted) failed:`, err3 instanceof Error ? err3.message : err3);
-
-          // Attempt 4: repair the sanitized stripped string
-          try {
-            parsed = JSON.parse(repairTruncatedJson(jsonStr));
-            console.warn(`[Parser] Repaired stripped JSON. Raw length: ${raw.length}`);
-          } catch (err4) {
+          const repaired = repairTruncatedJson(jsonStr);
+          parsed = JSON.parse(repaired);
+          console.warn(
+            `[Parser] Successfully repaired truncated JSON response. ` +
+            `Original length: ${raw.length}, Repaired length: ${repaired.length}`
+          );
+        } catch (err) {
+          console.warn(`[Parser] Attempt 3 (repair stripped) failed:`, err instanceof Error ? err.message : err);
+          // Fallback 3: try repairing the matched substring
+          if (jsonMatch) {
+            try {
+              const repaired = repairTruncatedJson(jsonMatch[0]);
+              parsed = JSON.parse(repaired);
+              console.warn(
+                `[Parser] Repaired truncated JSON from substring match. ` +
+                `Original length: ${raw.length}`
+              );
+            } catch (err) {
+              console.error(
+                `[Parser] All JSON parsing attempts failed. Raw length: ${raw.length}, ` +
+                `Last 200 chars: ${raw.substring(raw.length - 200)}`,
+                err instanceof Error ? err.message : err
+              );
+              return {
+                executiveSummary: "",
+                overallRisk: "medium",
+                clauses: [],
+                negotiationStrategy: "",
+                negotiationItems: [],
+                greenCount: 0,
+                yellowCount: 0,
+                redCount: 0,
+                rawAnalysis: raw,
+              };
+            }
+          } else {
             console.error(
-              `[Parser] All JSON parsing attempts failed. Raw length: ${raw.length}, ` +
-              `Last 200 chars: ${raw.substring(raw.length - 200)}`,
-              err4 instanceof Error ? err4.message : err4,
+              `[Parser] No JSON object found in response. Raw length: ${raw.length}`
             );
-            return EMPTY_RESULT;
+            return {
+              executiveSummary: "",
+              overallRisk: "medium",
+              clauses: [],
+              negotiationStrategy: "",
+              negotiationItems: [],
+              greenCount: 0,
+              yellowCount: 0,
+              redCount: 0,
+              rawAnalysis: raw,
+            };
           }
         }
       }
     } else {
-      // No braces found at all — try repair on the stripped string
+      // No JSON match at all — try repair on the stripped string
       try {
-        parsed = JSON.parse(repairTruncatedJson(jsonStr));
-        console.warn(`[Parser] Repaired JSON (no braces found). Raw length: ${raw.length}`);
-      } catch (err2) {
+        const repaired = repairTruncatedJson(jsonStr);
+        parsed = JSON.parse(repaired);
+        console.warn(`[Parser] Repaired truncated JSON (no brace match). Raw length: ${raw.length}`);
+      } catch (err) {
         console.error(
           `[Parser] No JSON structure found. Raw length: ${raw.length}, ` +
           `First 200 chars: ${raw.substring(0, 200)}`,
-          err2 instanceof Error ? err2.message : err2,
+          err instanceof Error ? err.message : err
         );
-        return EMPTY_RESULT;
+        return {
+          executiveSummary: "",
+          overallRisk: "medium",
+          clauses: [],
+          negotiationStrategy: "",
+          negotiationItems: [],
+          greenCount: 0,
+          yellowCount: 0,
+          redCount: 0,
+          rawAnalysis: raw,
+        };
       }
     }
   }
@@ -283,6 +301,7 @@ export function parseContractAnalysis(raw: string): StructuredAnalysisResult {
       clauseNumber: clause.clauseNumber || "",
       clauseName: clause.clauseName || `Clause ${index + 1}`,
       clauseText: clause.clauseText || "",
+      clauseTextFormatted: clause.clauseTextFormatted || clause.clauseText || "",
       position: clause.position || index + 1,
       findings: (clause.findings || []).map((f) => ({
         riskLevel: (["GREEN", "YELLOW", "RED"].includes(f.riskLevel)

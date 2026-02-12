@@ -1,215 +1,183 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { useState, useMemo } from "react";
+import { ArrowUpDown, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-  Check,
-  Eye,
-  X,
-} from "lucide-react";
-import type { Clause, Finding } from "./types";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { Clause } from "./types";
 
 interface ClauseListProps {
   clauses: Clause[];
   selectedClauseId: string | null;
   finalized: boolean;
-  onSelectClause: (clauseId: string) => void;
+  onSelectClause: (id: string) => void;
 }
 
-function getHighestRisk(
-  findings: Clause["findings"]
-): "RED" | "YELLOW" | "GREEN" | null {
-  if (findings.length === 0) return null;
-  if (findings.some((f) => f.riskLevel === "RED")) return "RED";
-  if (findings.some((f) => f.riskLevel === "YELLOW")) return "YELLOW";
-  return "GREEN";
+function getMaxRisk(findings: { riskLevel: string }[]): string {
+  return findings.reduce(
+    (max, f) =>
+      f.riskLevel === "RED" ? "RED" : f.riskLevel === "YELLOW" && max !== "RED" ? "YELLOW" : max,
+    "GREEN"
+  );
 }
 
-const riskConfig = {
-  RED: {
-    icon: AlertCircle,
-    badgeClass: "bg-red-50 text-red-700 border-red-200",
-    label: "High",
-  },
-  YELLOW: {
-    icon: AlertTriangle,
-    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
-    label: "Medium",
-  },
-  GREEN: {
-    icon: CheckCircle2,
-    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    label: "Low",
-  },
+const riskLabel: Record<string, string> = {
+  RED: "High",
+  YELLOW: "Med",
+  GREEN: "Low",
 };
 
-/** Get triage decision counts for a clause's findings */
-function getTriageSummary(findings: Finding[]) {
-  let accepted = 0;
-  let needsReview = 0;
-  let rejected = 0;
-  let pending = 0;
-  let lastTriagedBy: string | null = null;
-  let lastTriagedAt: string | null = null;
+const riskOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
 
-  for (const f of findings) {
-    if (f.triageDecision === "ACCEPT") accepted++;
-    else if (f.triageDecision === "NEEDS_REVIEW") needsReview++;
-    else if (f.triageDecision === "REJECT") rejected++;
-    else pending++;
+type RiskFilter = "ALL" | "RED" | "YELLOW" | "GREEN";
+type SortMode = "position" | "risk" | "triage";
 
-    // Track most recent triage action
-    if (f.triagedAt && (!lastTriagedAt || f.triagedAt > lastTriagedAt)) {
-      lastTriagedAt = f.triagedAt;
-      lastTriagedBy = f.triagedByName;
+export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClause }: ClauseListProps) {
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("ALL");
+  const [sortMode, setSortMode] = useState<SortMode>("position");
+
+  const filteredAndSorted = useMemo(() => {
+    let result = [...clauses];
+
+    // Filter
+    if (riskFilter !== "ALL") {
+      result = result.filter((c) => {
+        if (c.findings.length === 0) return false;
+        return getMaxRisk(c.findings) === riskFilter;
+      });
     }
-  }
 
-  return { accepted, needsReview, rejected, pending, lastTriagedBy };
-}
+    // Sort
+    if (sortMode === "risk") {
+      result.sort((a, b) => {
+        const rA = a.findings.length > 0 ? riskOrder[getMaxRisk(a.findings)] ?? 3 : 3;
+        const rB = b.findings.length > 0 ? riskOrder[getMaxRisk(b.findings)] ?? 3 : 3;
+        return rA - rB;
+      });
+    } else if (sortMode === "triage") {
+      result.sort((a, b) => {
+        const pendingA = a.findings.filter((f) => !f.triageDecision).length;
+        const pendingB = b.findings.filter((f) => !f.triageDecision).length;
+        return pendingB - pendingA;
+      });
+    }
 
-export function ClauseList({
-  clauses,
-  selectedClauseId,
-  finalized,
-  onSelectClause,
-}: ClauseListProps) {
+    return result;
+  }, [clauses, riskFilter, sortMode]);
+
   if (clauses.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full p-4 text-sm text-muted-foreground">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-4 text-sm text-muted-foreground">
         No clauses found
       </div>
     );
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-0.5 p-2">
-        {clauses.map((clause) => {
-          const highestRisk = getHighestRisk(clause.findings);
-          const isSelected = clause.id === selectedClauseId;
-          const RiskIcon = highestRisk ? riskConfig[highestRisk].icon : null;
+    <div className="flex-1 min-h-0 flex flex-col bg-muted/40 overflow-hidden">
+      <div className="px-3 py-2.5 border-b space-y-2 shrink-0">
+        <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
+          Clauses ({clauses.length})
+        </p>
+        {/* Filter & Sort controls */}
+        <div className="flex items-center gap-1">
+          {/* Risk filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className={cn(
+                "h-6 text-[10px] px-2 gap-1",
+                riskFilter !== "ALL" && "bg-primary/10 text-foreground"
+              )}>
+                <Filter className="h-3 w-3" />
+                {riskFilter === "ALL" ? "All" : riskLabel[riskFilter]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[100px]">
+              <DropdownMenuItem onClick={() => setRiskFilter("ALL")} className="text-xs">All</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRiskFilter("RED")} className="text-xs">High</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRiskFilter("YELLOW")} className="text-xs">Medium</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRiskFilter("GREEN")} className="text-xs">Low</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          const totalFindings = clause.findings.length;
-          const triage = getTriageSummary(clause.findings);
-          const allTriaged = totalFindings > 0 && triage.pending === 0;
-
-          return (
-            <button
-              key={clause.id}
-              onClick={() => onSelectClause(clause.id)}
-              className={cn(
-                "w-full text-left rounded-lg px-3 py-2.5 transition-all",
-                "hover:bg-slate-50 dark:hover:bg-slate-800/50",
-                "border border-transparent",
-                isSelected && "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
-                finalized && "border-l-2 border-l-slate-300 opacity-80"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={cn(
-                      "text-sm font-medium truncate",
-                      isSelected && "text-foreground"
-                    )}
-                  >
-                    {clause.clauseNumber
-                      ? `§${clause.clauseNumber} — ${clause.clauseName}`
-                      : clause.clauseName}
-                  </p>
-
-                  {/* Triage status row */}
-                  {totalFindings > 0 && (
-                    <div className="mt-1.5 space-y-1">
-                      {/* Decision breakdown — shown for both finalized and non-finalized */}
-                      {(allTriaged || finalized) ? (
-                        <div className="flex items-center gap-0.5 flex-wrap">
-                          {finalized && (
-                            <Lock className="h-2.5 w-2.5 text-slate-400 mr-0.5" />
-                          )}
-                          {triage.accepted > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0">
-                              <Check className="h-2.5 w-2.5" />
-                              {triage.accepted}
-                            </span>
-                          )}
-                          {triage.needsReview > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0">
-                              <Eye className="h-2.5 w-2.5" />
-                              {triage.needsReview}
-                            </span>
-                          )}
-                          {triage.rejected > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0">
-                              <X className="h-2.5 w-2.5" />
-                              {triage.rejected}
-                            </span>
-                          )}
-                        </div>
-                      ) : triage.pending < totalFindings ? (
-                        /* Some triaged — show inline decision pills + remaining count */
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <div className="flex items-center gap-0.5">
-                            {triage.accepted > 0 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0">
-                                <Check className="h-2.5 w-2.5" />
-                                {triage.accepted}
-                              </span>
-                            )}
-                            {triage.needsReview > 0 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0">
-                                <Eye className="h-2.5 w-2.5" />
-                                {triage.needsReview}
-                              </span>
-                            )}
-                            {triage.rejected > 0 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0">
-                                <X className="h-2.5 w-2.5" />
-                                {triage.rejected}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400">
-                            +{triage.pending} pending
-                          </span>
-                        </div>
-                      ) : null}
-
-                      {/* Show who last triaged */}
-                      {triage.lastTriagedBy && (
-                        <p className="text-[10px] text-slate-400 truncate">
-                          by {triage.lastTriagedBy}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                  {clause.findings.length > 0 && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "px-1.5 py-0 text-xs",
-                        highestRisk && riskConfig[highestRisk].badgeClass
-                      )}
-                    >
-                      {RiskIcon && <RiskIcon className="mr-0.5 h-3 w-3" />}
-                      {clause.findings.length}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+          {/* Sort */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className={cn(
+                "h-6 text-[10px] px-2 gap-1",
+                sortMode !== "position" && "bg-primary/10 text-foreground"
+              )}>
+                <ArrowUpDown className="h-3 w-3" />
+                {sortMode === "position" ? "Order" : sortMode === "risk" ? "Risk" : "Triage"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[120px]">
+              <DropdownMenuItem onClick={() => setSortMode("position")} className="text-xs">Document order</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortMode("risk")} className="text-xs">By risk level</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortMode("triage")} className="text-xs">By triage status</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-    </ScrollArea>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-2 space-y-0.5">
+          {filteredAndSorted.length === 0 && (
+            <p className="text-xs text-muted-foreground/60 text-center py-4">No clauses match filter</p>
+          )}
+          {filteredAndSorted.map((clause) => {
+            const maxRisk = getMaxRisk(clause.findings);
+            const isSelected = selectedClauseId === clause.id;
+            const findingCount = clause.findings.length;
+            return (
+              <button
+                key={clause.id}
+                onClick={() => onSelectClause(clause.id)}
+                className={cn(
+                  "w-full text-left rounded-md px-3 py-2.5 transition-all group",
+                  isSelected
+                    ? "bg-primary/10 border-l-2 border-primary"
+                    : "hover:bg-muted border-l-2 border-transparent",
+                  finalized && "opacity-70"
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn(
+                    "font-medium text-xs",
+                    isSelected ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {clause.clauseNumber ? `§${clause.clauseNumber}` : clause.clauseName}
+                  </span>
+                  {findingCount > 0 && (
+                    <span className={cn(
+                      "text-xs font-medium px-2.5 py-0.5 rounded-full border",
+                      maxRisk === "RED" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
+                      maxRisk === "YELLOW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
+                      "bg-risk-green-soft text-risk-green border-risk-green-border"
+                    )}>
+                      {riskLabel[maxRisk]}
+                    </span>
+                  )}
+                </div>
+                {clause.clauseNumber && (
+                  <p className={cn(
+                    "text-xs truncate mt-0.5",
+                    isSelected ? "text-foreground/70" : "text-muted-foreground/60"
+                  )}>
+                    {clause.clauseName}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }

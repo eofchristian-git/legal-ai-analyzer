@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
 
     // Build group name lookup for snapshot rules
     const allGroups = await db.playbookGroup.findMany();
-    const groupMap = Object.fromEntries(allGroups.map((g) => [g.id, g.name]));
+    const groupMap = Object.fromEntries(allGroups.map((g: any) => [g.id, g.name]));
 
-    const result = await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx: any) => {
       // Soft-delete all current active rules
       await tx.playbookRule.updateMany({
         where: { playbookId: playbook.id, deleted: false },
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       version: newVersion,
       ruleCount: result.createdRules.length,
-      rules: result.createdRules.map((r) => ({
+      rules: result.createdRules.map((r: any) => ({
         id: r.id,
         title: r.title,
         description: r.description,

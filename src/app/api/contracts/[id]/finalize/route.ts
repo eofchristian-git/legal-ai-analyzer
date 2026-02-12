@@ -43,8 +43,8 @@ export async function POST(
     }
 
     // Check that all findings have a triage decision
-    const allFindings = contract.analysis.clauses.flatMap((c) => c.findings);
-    const pendingFindings = allFindings.filter((f) => !f.triageDecision);
+    const allFindings = contract.analysis.clauses.flatMap((c: any) => c.findings);
+    const pendingFindings = allFindings.filter((f: any) => !f.triageDecision);
 
     if (pendingFindings.length > 0) {
       return NextResponse.json(
