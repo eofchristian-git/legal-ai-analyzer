@@ -100,9 +100,9 @@ export function InlineRuleForm({
   const positionsComplete = useMemo(
     () =>
       !!(
-        form.standardPosition &&
-        form.acceptableRange &&
-        form.escalationTrigger &&
+        form.standardPosition ||
+        form.acceptableRange ||
+        form.escalationTrigger ||
         form.negotiationGuidance
       ),
     [
@@ -122,17 +122,6 @@ export function InlineRuleForm({
       toast.error("Please fill in all required fields in Details");
       return;
     }
-    if (
-      !form.standardPosition ||
-      !form.acceptableRange ||
-      !form.escalationTrigger ||
-      !form.negotiationGuidance
-    ) {
-      handleTabChange("positions");
-      toast.error("Please fill in all required fields in Positions");
-      return;
-    }
-
     onSubmit(form);
   }
 
@@ -340,8 +329,7 @@ export function InlineRuleForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="inline-rule-standard" className="text-xs">
-                  Standard Position{" "}
-                  <span className="text-destructive">*</span>
+                  Standard Position
                 </Label>
                 <Textarea
                   id="inline-rule-standard"
@@ -359,8 +347,7 @@ export function InlineRuleForm({
               </div>
               <div className="space-y-1">
                 <Label htmlFor="inline-rule-range" className="text-xs">
-                  Acceptable Range{" "}
-                  <span className="text-destructive">*</span>
+                  Acceptable Range
                 </Label>
                 <Textarea
                   id="inline-rule-range"
@@ -378,8 +365,7 @@ export function InlineRuleForm({
               </div>
               <div className="space-y-1">
                 <Label htmlFor="inline-rule-escalation" className="text-xs">
-                  Escalation Trigger{" "}
-                  <span className="text-destructive">*</span>
+                  Escalation Trigger
                 </Label>
                 <Textarea
                   id="inline-rule-escalation"
@@ -397,8 +383,7 @@ export function InlineRuleForm({
               </div>
               <div className="space-y-1">
                 <Label htmlFor="inline-rule-guidance" className="text-xs">
-                  Negotiation Guidance{" "}
-                  <span className="text-destructive">*</span>
+                  Negotiation Guidance
                 </Label>
                 <Textarea
                   id="inline-rule-guidance"

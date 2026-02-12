@@ -4,12 +4,11 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Scale, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
-import emagineLogoSvg from "@/assets/emagine-logo.svg";
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { EmagineLogo } from "@/components/shared/emagine-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,19 +45,10 @@ export default function LoginPage() {
 
   return (
     <div className="space-y-8">
-      {/* Mobile-only branding (hidden on lg where side panel shows) */}
-      <div className="flex flex-col items-center gap-3 lg:hidden">
-        <Image
-          src={emagineLogoSvg}
-          alt="Emagine"
-          width={140}
-          height={24}
-          priority
-        />
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Scale className="h-4 w-4" />
-          <span className="text-sm font-medium">Legal AI Analyzer</span>
-        </div>
+      {/* Mobile branding */}
+      <div className="flex flex-col items-center gap-2 lg:hidden">
+        <EmagineLogo className="h-5 text-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">Legal AI Analyzer</span>
       </div>
 
       {/* Header */}
@@ -136,7 +126,7 @@ export default function LoginPage() {
         Don&apos;t have an account?{" "}
         <Link
           href="/signup"
-          className="font-medium text-primary hover:underline underline-offset-4"
+          className="font-medium text-foreground hover:underline underline-offset-4"
         >
           Create account
         </Link>

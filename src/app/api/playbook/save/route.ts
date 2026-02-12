@@ -9,10 +9,10 @@ interface RuleInput {
   description: string;
   country?: string | null;
   riskLevel: string;
-  standardPosition: string;
-  acceptableRange: string;
-  escalationTrigger: string;
-  negotiationGuidance: string;
+  standardPosition?: string;
+  acceptableRange?: string;
+  escalationTrigger?: string;
+  negotiationGuidance?: string;
   groupId?: string | null;
 }
 
@@ -37,11 +37,7 @@ export async function POST(req: NextRequest) {
       if (
         !r.title?.trim() ||
         !r.description?.trim() ||
-        !r.riskLevel ||
-        !r.standardPosition?.trim() ||
-        !r.acceptableRange?.trim() ||
-        !r.escalationTrigger?.trim() ||
-        !r.negotiationGuidance?.trim()
+        !r.riskLevel
       ) {
         return NextResponse.json(
           { error: `Rule ${i + 1} ("${r.title || "untitled"}") is missing required fields` },
@@ -66,9 +62,9 @@ export async function POST(req: NextRequest) {
 
     // Build group name lookup for snapshot rules
     const allGroups = await db.playbookGroup.findMany();
-    const groupMap = Object.fromEntries(allGroups.map((g) => [g.id, g.name]));
+    const groupMap = Object.fromEntries(allGroups.map((g: any) => [g.id, g.name]));
 
-    const result = await db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx: any) => {
       // Soft-delete all current active rules
       await tx.playbookRule.updateMany({
         where: { playbookId: playbook.id, deleted: false },
@@ -86,10 +82,10 @@ export async function POST(req: NextRequest) {
             country: r.country || null,
             riskLevel: r.riskLevel,
             groupId: r.groupId || null,
-            standardPosition: r.standardPosition.trim(),
-            acceptableRange: r.acceptableRange.trim(),
-            escalationTrigger: r.escalationTrigger.trim(),
-            negotiationGuidance: r.negotiationGuidance.trim(),
+            standardPosition: r.standardPosition?.trim() || null,
+            acceptableRange: r.acceptableRange?.trim() || null,
+            escalationTrigger: r.escalationTrigger?.trim() || null,
+            negotiationGuidance: r.negotiationGuidance?.trim() || null,
             createdBy: userId,
             updatedBy: userId,
           },
@@ -145,7 +141,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       version: newVersion,
       ruleCount: result.createdRules.length,
-      rules: result.createdRules.map((r) => ({
+      rules: result.createdRules.map((r: any) => ({
         id: r.id,
         title: r.title,
         description: r.description,

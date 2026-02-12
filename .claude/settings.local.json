@@ -21,7 +21,16 @@
       "Bash(powershell -Command \"Copy-Item ''node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node.tmp*'' ''node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node'' -Force -ErrorAction SilentlyContinue\")",
       "Bash(powershell:*)",
       "Bash(node -e:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "WebSearch",
+      "Bash(Remove-Item -Path \"postcss.config.js\" -Force)",
+      "Bash(Remove-Item -Path \"src/pages\" -Recurse -Force)",
+      "Bash(npm ls:*)",
+      "Bash(for comp in accordion alert-dialog alert aspect-ratio avatar breadcrumb calendar carousel chart checkbox command context-menu drawer form hover-card input-otp menubar navigation-menu pagination popover radio-group resizable sidebar slider sonner switch toast toaster toggle-group toggle use-toast)",
+      "Bash(do echo -n \"$comp: \")",
+      "Bash(done)"
     ]
   }
 }

@@ -6,10 +6,10 @@ export interface PlaybookRuleForPrompt {
   description: string;
   country?: string | null;
   riskLevel: string;
-  standardPosition: string;
-  acceptableRange: string;
-  escalationTrigger: string;
-  negotiationGuidance: string;
+  standardPosition?: string | null;
+  acceptableRange?: string | null;
+  escalationTrigger?: string | null;
+  negotiationGuidance?: string | null;
 }
 
 export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
@@ -18,18 +18,19 @@ export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
       const country = rule.country
         ? getCountryByCode(rule.country)?.name || rule.country
         : "Global";
-      return [
+      const lines = [
         `### ${rule.title}`,
         "",
         `**Business Context**: ${rule.description}`,
         `**Jurisdiction**: ${country}`,
         `**Risk Level**: ${rule.riskLevel}`,
         "",
-        `- **Standard Position**: ${rule.standardPosition}`,
-        `- **Acceptable Range**: ${rule.acceptableRange}`,
-        `- **Escalation Trigger**: ${rule.escalationTrigger}`,
-        `- **Negotiation Guidance**: ${rule.negotiationGuidance}`,
-      ].join("\n");
+      ];
+      if (rule.standardPosition) lines.push(`- **Standard Position**: ${rule.standardPosition}`);
+      if (rule.acceptableRange) lines.push(`- **Acceptable Range**: ${rule.acceptableRange}`);
+      if (rule.escalationTrigger) lines.push(`- **Escalation Trigger**: ${rule.escalationTrigger}`);
+      if (rule.negotiationGuidance) lines.push(`- **Negotiation Guidance**: ${rule.negotiationGuidance}`);
+      return lines.join("\n");
     })
     .join("\n\n");
 }
@@ -63,17 +64,55 @@ export async function buildContractReviewPrompt(params: {
 
   parts.push("", "## Contract Text", "", params.contractText, "", "---", "");
   parts.push(
-    "Provide a clause-by-clause analysis. For each clause, classify as GREEN, YELLOW, or RED.",
-    "For YELLOW and RED items, provide specific redline language.",
-    "End with a negotiation strategy and next steps.",
+    "Analyze the contract clause by clause. For each clause, identify findings against the playbook rules (or general best practices if no playbook is provided).",
     "",
-    "Structure your response with these exact markdown headers:",
-    "## Executive Summary",
-    "## Key Findings",
-    "## Clause-by-Clause Analysis",
-    "### [Clause Name] -- [GREEN|YELLOW|RED]",
-    "## Negotiation Strategy",
-    "## Next Steps"
+    "You MUST respond with ONLY a valid JSON object (no markdown, no code fences, no explanation outside the JSON). Use this exact schema:",
+    "",
+    '```json',
+    '{',
+    '  "executiveSummary": "string — 2-3 sentence overview of the contract risk posture",',
+    '  "overallRisk": "low|medium|high",',
+    '  "clauses": [',
+    '    {',
+    '      "clauseNumber": "string — the original section/article/clause number as it appears in the document (e.g. \"3.1\", \"Article 5\", \"Section 12\", \"§7\"). Use \"\" if the document has no numbering.",',
+    '      "clauseName": "string — name/title of the clause (e.g. Limitation of Liability)",',
+    '      "clauseText": "string — the FULL, VERBATIM, UNABRIDGED original text of this clause exactly as it appears in the contract. Do NOT summarize, paraphrase, or shorten it. Copy the entire clause word-for-word.",',
+    '      "clauseTextFormatted": "string — the same clause text reformatted as clean markdown for readability. Use paragraph breaks, sub-section headers (###), numbered/bulleted lists where the original uses (a)/(b)/(i)/(ii) patterns, and **bold** for defined terms. Do NOT add, remove, or rephrase any content — use the exact same words as clauseText, just with markdown formatting.",',
+    '      "position": 1,',
+    '      "findings": [',
+    '        {',
+    '          "riskLevel": "GREEN|YELLOW|RED",',
+    '          "matchedRuleTitle": "string — title of the playbook rule that triggered this finding",',
+    '          "summary": "string — plain-language summary of the issue",',
+    '          "fallbackText": "string — recommended alternative contract language based on the playbook rule",',
+    '          "whyTriggered": "string — explanation of why this rule was triggered, linking back to the specific playbook rule or standard",',
+    '          "excerpt": "string — an exact, verbatim substring copied from the clauseText that triggered this finding. Must be a word-for-word match of a passage in clauseText."',
+    '        }',
+    '      ]',
+    '    }',
+    '  ],',
+    '  "negotiationStrategy": [',
+    '    {',
+    '      "priority": "P1|P2|P3 — P1 = Critical/must-address, P2 = Important/should-address, P3 = Nice-to-have/minor",',
+    '      "title": "string — concise title for this negotiation point",',
+    '      "description": "string — detailed negotiation guidance and reasoning",',
+    '      "clauseRef": "string|null — the clause name or number this point relates to, or null if general"',
+    '    }',
+    '  ]',
+    '}',
+    '```',
+    "",
+    "Rules:",
+    "- clauseNumber: Extract the original numbering exactly as it appears. Look for patterns like '1.', '1.1', 'Article I', 'Section 1', 'Clause 1', '(a)', 'ARTICLE I', etc. Only return empty string if the document genuinely has no visible numbering.",
+    "- Position values must be sequential starting at 1.",
+    "- Every clause must appear even if it has zero findings (empty findings array).",
+    "- clauseText MUST contain the complete, unmodified original text from the contract. Never truncate, summarize, or paraphrase it.",
+    "- clauseTextFormatted must contain the same substantive content as clauseText, just with markdown formatting (paragraph breaks, headers, lists, bold defined terms) for readability. Do not add or remove words.",
+    "- riskLevel for findings must be exactly GREEN, YELLOW, or RED.",
+    "- overallRisk must be exactly low, medium, or high.",
+    "- excerpt MUST be an exact, verbatim substring of the clauseText for that clause. Do NOT paraphrase or summarize — copy the triggering passage word-for-word.",
+    "- negotiationStrategy MUST be a JSON array of priority items, NOT a string. Each item must have priority (P1/P2/P3), title, description, and optionally clauseRef.",
+    "- Respond with ONLY the JSON object, nothing else."
   );
 
   return { systemPrompt, userMessage: parts.join("\n") };

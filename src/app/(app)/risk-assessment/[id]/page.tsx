@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SeverityBadge } from "@/components/shared/severity-badge";
-import { DisclaimerBanner } from "@/components/shared/disclaimer-banner";
+
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -124,7 +124,6 @@ export default function RiskAssessmentDetailPage() {
     <div>
       <PageHeader title={risk.title} description={risk.document.filename} />
       <div className="space-y-6 p-8">
-        <DisclaimerBanner />
 
         {/* Score summary */}
         {risk.riskScore !== null && (

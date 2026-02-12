@@ -25,31 +25,34 @@ model Document {
 }
 
 model Contract {
-  id           String    @id @default(cuid())
-  documentId   String
-  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  title        String
-  contractType String?
-  ourSide      String
-  counterparty String?
-  deadline     DateTime?
-  focusAreas   String?
+  id            String    @id @default(cuid())
+  documentId    String
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title         String
+  contractType  String?
+  ourSide       String
+  counterparty  String?
+  deadline      DateTime?
+  focusAreas    String?
   dealContext   String?
-  status       String    @default("pending")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  status        String    @default("pending")
+  createdBy     String?
+  createdByUser User?     @relation("ContractsCreated", fields: [createdBy], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  analysis ContractAnalysis?
+  analysis     ContractAnalysis?
+  activityLogs ActivityLog[]
 }
 
 model ContractAnalysis {
-  id                  String   @id @default(cuid())
-  contractId          String   @unique
-  contract            Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  id                  String            @id @default(cuid())
+  contractId          String            @unique
+  contract            Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
   overallRisk         String
-  greenCount          Int      @default(0)
-  yellowCount         Int      @default(0)
-  redCount            Int      @default(0)
+  greenCount          Int               @default(0)
+  yellowCount         Int               @default(0)
+  redCount            Int               @default(0)
   rawAnalysis         String
   clauseAnalyses      String
   redlineSuggestions  String
@@ -59,7 +62,18 @@ model ContractAnalysis {
   tokensUsed          Int?
   reviewBasis         String
   playbookVersionId   String?
-  createdAt           DateTime @default(now())
+  playbookSnapshotId  String?
+  playbookSnapshot    PlaybookSnapshot? @relation(fields: [playbookSnapshotId], references: [id])
+  finalized           Boolean           @default(false)
+  finalizedAt         DateTime?
+  finalizedBy         String?
+  finalizedByUser     User?             @relation("AnalysesFinalizedBy", fields: [finalizedBy], references: [id])
+  createdBy           String?
+  createdByUser       User?             @relation("AnalysesCreated", fields: [createdBy], references: [id])
+  createdAt           DateTime          @default(now())
+
+  clauses           AnalysisClause[]
+  negotiationItems  NegotiationItem[]
 }
 
 model NdaTriage {
@@ -150,15 +164,15 @@ model PlaybookRule {
   description         String
   country             String?
   riskLevel           String
-  standardPosition    String
-  acceptableRange     String
-  escalationTrigger   String
-  negotiationGuidance String
-  deleted             Boolean  @default(false)
+  standardPosition    String?
+  acceptableRange     String?
+  escalationTrigger   String?
+  negotiationGuidance String?
+  deleted             Boolean        @default(false)
   createdBy           String
   updatedBy           String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 }
 
 model PlaybookSnapshot {
@@ -169,7 +183,8 @@ model PlaybookSnapshot {
   createdBy  String
   createdAt  DateTime @default(now())
 
-  rules PlaybookSnapshotRule[]
+  rules    PlaybookSnapshotRule[]
+  analyses ContractAnalysis[]
 }
 
 model PlaybookSnapshotRule {
@@ -182,14 +197,86 @@ model PlaybookSnapshotRule {
   description         String
   country             String?
   riskLevel           String
-  standardPosition    String
-  acceptableRange     String
-  escalationTrigger   String
-  negotiationGuidance String
+  standardPosition    String?
+  acceptableRange     String?
+  escalationTrigger   String?
+  negotiationGuidance String?
   originalRuleId      String
   createdBy           String
   originalCreatedAt   DateTime
   createdAt           DateTime         @default(now())
+}
+
+model AnalysisClause {
+  id           String           @id @default(cuid())
+  analysisId   String
+  analysis     ContractAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  clauseNumber String           @default("")
+  clauseName          String
+  clauseText          String
+  clauseTextFormatted String?
+  position            Int
+  createdAt    DateTime         @default(now())
+
+  findings AnalysisFinding[]
+
+  @@unique([analysisId, position])
+}
+
+model AnalysisFinding {
+  id               String         @id @default(cuid())
+  clauseId         String
+  clause           AnalysisClause @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  riskLevel        String
+  matchedRuleTitle String
+  matchedRuleId    String?
+  summary          String
+  fallbackText     String
+  whyTriggered     String
+  excerpt          String         @default("")
+  triageDecision   String?
+  triageNote       String?
+  triagedBy        String?
+  triagedByUser    User?          @relation("FindingsTriagedBy", fields: [triagedBy], references: [id])
+  triagedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  comments FindingComment[]
+}
+
+model FindingComment {
+  id        String          @id @default(cuid())
+  findingId String
+  finding   AnalysisFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User            @relation("FindingComments", fields: [userId], references: [id])
+  content   String
+  createdAt DateTime        @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  action     String
+  userId     String
+  user       User     @relation("ActivityLogs", fields: [userId], references: [id])
+  targetType String?
+  targetId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+}
+
+model NegotiationItem {
+  id          String           @id @default(cuid())
+  analysisId  String
+  analysis    ContractAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  priority    String           // "P1" | "P2" | "P3"
+  title       String
+  description String
+  clauseRef   String?
+  position    Int
+  createdAt   DateTime         @default(now())
 }
 
 model User {
@@ -200,4 +287,11 @@ model User {
   role      String   @default("legal")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  contractsCreated    Contract[]         @relation("ContractsCreated")
+  analysesCreated     ContractAnalysis[] @relation("AnalysesCreated")
+  analysesFinalizedBy ContractAnalysis[] @relation("AnalysesFinalizedBy")
+  findingsTriagedBy   AnalysisFinding[]  @relation("FindingsTriagedBy")
+  findingComments     FindingComment[]   @relation("FindingComments")
+  activityLogs        ActivityLog[]      @relation("ActivityLogs")
 }

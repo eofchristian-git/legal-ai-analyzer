@@ -10,23 +10,23 @@ interface RiskLevelBadgeProps {
 const config = {
   LOW: {
     label: "Low",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
-    dotColor: "bg-emerald-500",
+    className: "bg-risk-green-soft text-risk-green border-risk-green-border",
+    dotColor: "bg-risk-green",
   },
   MEDIUM: {
     label: "Medium",
-    className: "bg-amber-50 text-amber-700 border-amber-200/60",
-    dotColor: "bg-amber-500",
+    className: "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border",
+    dotColor: "bg-risk-yellow",
   },
   HIGH: {
     label: "High",
-    className: "bg-orange-50 text-orange-700 border-orange-200/60",
-    dotColor: "bg-orange-500",
+    className: "bg-risk-red-soft text-risk-red border-risk-red-border",
+    dotColor: "bg-risk-red",
   },
   CRITICAL: {
     label: "Critical",
-    className: "bg-red-50 text-red-700 border-red-200/60",
-    dotColor: "bg-red-500",
+    className: "bg-risk-red-soft text-risk-red border-risk-red-border",
+    dotColor: "bg-risk-red",
   },
 };
 
@@ -43,7 +43,7 @@ export function RiskLevelBadge({
       className={cn(
         "font-medium gap-1.5",
         className,
-        size === "sm" ? "px-1.5 py-0 text-[11px]" : "px-2 py-0.5 text-xs"
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs"
       )}
     >
       {showDot && (
@@ -51,7 +51,7 @@ export function RiskLevelBadge({
           className={cn(
             "rounded-full shrink-0",
             dotColor,
-            size === "sm" ? "h-1.5 w-1.5" : "h-2 w-2"
+            size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5"
           )}
         />
       )}
@@ -63,13 +63,12 @@ export function RiskLevelBadge({
 export function getRiskBorderColor(level: string) {
   switch (level) {
     case "LOW":
-      return "border-l-emerald-400";
+      return "border-l-risk-green";
     case "MEDIUM":
-      return "border-l-amber-400";
+      return "border-l-risk-yellow";
     case "HIGH":
-      return "border-l-orange-400";
     case "CRITICAL":
-      return "border-l-red-400";
+      return "border-l-risk-red";
     default:
       return "border-l-border";
   }

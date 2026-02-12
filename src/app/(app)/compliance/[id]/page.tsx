@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DisclaimerBanner } from "@/components/shared/disclaimer-banner";
+
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import { Loader2 } from "lucide-react";
 
@@ -58,7 +58,6 @@ export default function ComplianceDetailPage() {
     <div>
       <PageHeader title={check.title} description={check.document.filename} />
       <div className="space-y-6 p-8">
-        <DisclaimerBanner />
 
         <Card>
           <CardHeader>

@@ -11,7 +11,7 @@ export async function GET() {
       },
     });
 
-    const result = analyses.map((a) => ({
+    const result = analyses.map((a: any) => ({
       id: a.id,
       contractTitle: a.contract.title,
       contractStatus: a.contract.status,

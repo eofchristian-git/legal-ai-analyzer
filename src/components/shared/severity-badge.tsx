@@ -9,24 +9,24 @@ interface SeverityBadgeProps {
 
 const config = {
   GREEN: {
-    label: "GREEN",
+    label: "Low",
     icon: CheckCircle2,
-    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    className: "bg-risk-green-soft text-risk-green border-risk-green-border",
   },
   YELLOW: {
-    label: "YELLOW",
+    label: "Medium",
     icon: AlertTriangle,
-    className: "bg-amber-100 text-amber-800 border-amber-200",
+    className: "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border",
   },
   ORANGE: {
-    label: "ORANGE",
+    label: "Medium",
     icon: AlertTriangle,
-    className: "bg-orange-100 text-orange-800 border-orange-200",
+    className: "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border",
   },
   RED: {
-    label: "RED",
+    label: "High",
     icon: AlertCircle,
-    className: "bg-red-100 text-red-800 border-red-200",
+    className: "bg-risk-red-soft text-risk-red border-risk-red-border",
   },
 };
 
@@ -38,10 +38,10 @@ export function SeverityBadge({ severity, size = "md" }: SeverityBadgeProps) {
       variant="outline"
       className={cn(
         className,
-        size === "sm" ? "px-1.5 py-0 text-xs" : "px-2 py-0.5 text-sm"
+        size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm"
       )}
     >
-      <Icon className={cn(size === "sm" ? "mr-1 h-3 w-3" : "mr-1.5 h-3.5 w-3.5")} />
+      <Icon className={cn(size === "sm" ? "mr-1 h-3.5 w-3.5" : "mr-1.5 h-4 w-4")} />
       {label}
     </Badge>
   );

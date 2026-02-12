@@ -119,8 +119,8 @@ export function RuleCard({
             </p>
 
             {/* Rule Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
+            {(() => {
+              const fields = [
                 {
                   icon: Target,
                   iconColor: "text-blue-500",
@@ -145,18 +145,24 @@ export function RuleCard({
                   label: "Negotiation Guidance",
                   value: rule.negotiationGuidance,
                 },
-              ].map(({ icon: Icon, iconColor, label, value }) => (
-                <div key={label} className="rounded-lg border bg-background p-3.5">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Icon className={cn("h-3.5 w-3.5", iconColor)} />
-                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                      {label}
-                    </p>
-                  </div>
-                  <p className="text-sm leading-relaxed">{value}</p>
+              ].filter(({ value }) => value);
+              if (fields.length === 0) return null;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {fields.map(({ icon: Icon, iconColor, label, value }) => (
+                    <div key={label} className="rounded-lg border bg-background p-3.5">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Icon className={cn("h-3.5 w-3.5", iconColor)} />
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                          {label}
+                        </p>
+                      </div>
+                      <p className="text-sm leading-relaxed">{value}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
             {/* Audit Footer */}
             <div className="flex items-center gap-4 pt-2 border-t text-xs text-muted-foreground">

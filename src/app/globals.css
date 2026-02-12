@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-legal: var(--font-legal);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,84 +46,196 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Risk semantic colors */
+  --color-risk-red: hsl(var(--risk-red));
+  --color-risk-red-soft: hsl(var(--risk-red-soft));
+  --color-risk-red-border: hsl(var(--risk-red-border));
+  --color-risk-yellow: hsl(var(--risk-yellow));
+  --color-risk-yellow-soft: hsl(var(--risk-yellow-soft));
+  --color-risk-yellow-border: hsl(var(--risk-yellow-border));
+  --color-risk-green: hsl(var(--risk-green));
+  --color-risk-green-soft: hsl(var(--risk-green-soft));
+  --color-risk-green-border: hsl(var(--risk-green-border));
+  --color-risk-info: hsl(var(--risk-info));
+  --color-risk-info-soft: hsl(var(--risk-info-soft));
+  --color-risk-info-border: hsl(var(--risk-info-border));
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --radius: 0rem;
+  --background: #f4f4f1;
+  --foreground: oklch(0.15 0 0);
+  --card: #f4f4f1;
+  --card-foreground: oklch(0.15 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+  --primary: oklch(0.87 0.2 120);
+  --primary-foreground: oklch(0.15 0 0);
   --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.15 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.55 0 0);
   --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent-foreground: oklch(0.15 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.97 0 0);
+  --ring: oklch(0.87 0.2 120);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.12 0 0);
+  --sidebar-foreground: oklch(0.75 0 0);
+  --sidebar-primary: oklch(0.87 0.2 120);
+  --sidebar-primary-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.18 0 0);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.16 0 0);
+  --sidebar-ring: oklch(0.87 0.2 120);
+
+  /* Risk semantic colors — "Modern risk" palette */
+  --risk-red: 356 75% 43%;      /* #C01C28 crimson */
+  --risk-red-soft: 356 55% 96%;
+  --risk-red-border: 356 55% 86%;
+  --risk-yellow: 38 100% 39%;   /* #C57C00 golden amber */
+  --risk-yellow-soft: 38 65% 96%;
+  --risk-yellow-border: 38 65% 86%;
+  --risk-green: 150 73% 29%;    /* #14804A emerald green */
+  --risk-green-soft: 150 50% 95%;
+  --risk-green-border: 150 50% 85%;
+  --risk-info: 219 58% 43%;     /* #2E5AAC blue */
+  --risk-info-soft: 219 45% 96%;
+  --risk-info-border: 219 45% 86%;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.14 0 0);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.18 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.87 0.2 120);
+  --primary-foreground: oklch(0.14 0 0);
+  --secondary: oklch(0.89 0.18 120);
+  --secondary-foreground: oklch(0.14 0 0);
+  --muted: oklch(0.24 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.24 0 0);
+  --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(0.28 0 0);
+  --input: oklch(0.22 0 0);
+  --ring: oklch(0.87 0.2 120);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.1 0 0);
+  --sidebar-foreground: oklch(0.75 0 0);
+  --sidebar-primary: oklch(0.87 0.2 120);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-accent: oklch(0.18 0 0);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.14 0 0);
+  --sidebar-ring: oklch(0.87 0.2 120);
+
+  --risk-red: 356 75% 55%;
+  --risk-red-soft: 356 50% 14%;
+  --risk-red-border: 356 50% 28%;
+  --risk-yellow: 38 100% 50%;
+  --risk-yellow-soft: 38 55% 14%;
+  --risk-yellow-border: 38 55% 28%;
+  --risk-green: 150 73% 40%;
+  --risk-green-soft: 150 45% 14%;
+  --risk-green-border: 150 45% 28%;
+  --risk-info: 219 58% 55%;
+  --risk-info-soft: 219 40% 14%;
+  --risk-info-border: 219 40% 28%;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklch, var(--color-ring) 50%, transparent);
   }
+
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
   }
+}
+
+.font-legal {
+  font-family: var(--font-legal), Georgia, 'Times New Roman', serif;
+}
+
+/* ============================================
+   Float Chaos Animation (Floating Icons)
+   ============================================ */
+@keyframes floatChaos {
+  0%, 100% {
+    transform: translateY(0) rotate(var(--rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(calc(var(--rotate, 0deg) + 3deg));
+  }
+}
+
+.float-chaos {
+  animation: floatChaos 3s ease-in-out infinite;
+}
+
+/* ============================================
+   Hover Effects (Case Study Patterns)
+   ============================================ */
+.hover-lift {
+  transition: all 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.card-hover {
+  transition: all 0.3s ease-out;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   Story Link Underline Animation
+   ============================================ */
+.story-link * {
+  @apply relative inline-block;
+}
+
+.story-link *::after {
+  content: '';
+  @apply absolute w-full bottom-0 left-0 h-0.5 bg-primary origin-bottom-right transition-transform duration-300;
+  transform: scaleX(0);
+}
+
+.story-link *:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* Hover Scale */
+.hover-scale {
+  transition: transform 0.2s ease-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
 }
 
 /* Playbook animations */

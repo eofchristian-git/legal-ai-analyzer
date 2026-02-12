@@ -119,7 +119,7 @@ export async function seedRules() {
 
   // Load all groups by slug
   const groups = await prisma.playbookGroup.findMany();
-  const slugToId = Object.fromEntries(groups.map((g) => [g.slug, g.id]));
+  const slugToId = Object.fromEntries(groups.map((g: any) => [g.slug, g.id]));
 
   if (groups.length === 0) {
     console.error("  ERROR: No playbook groups found. Run the groups seed first.");
@@ -194,7 +194,7 @@ export async function seedRules() {
     orderBy: { createdAt: "asc" },
   });
 
-  const groupNameMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
+  const groupNameMap = Object.fromEntries(groups.map((g: any) => [g.id, g.name]));
 
   const snapshot = await prisma.playbookSnapshot.create({
     data: {
@@ -205,7 +205,7 @@ export async function seedRules() {
   });
 
   await prisma.playbookSnapshotRule.createMany({
-    data: activeRules.map((rule) => ({
+    data: activeRules.map((rule: any) => ({
       snapshotId: snapshot.id,
       title: rule.title,
       description: rule.description,
@@ -228,7 +228,7 @@ export async function seedRules() {
 
   // Summary by group
   for (const g of groups) {
-    const count = activeRules.filter((r) => r.groupId === g.id).length;
+    const count = activeRules.filter((r: any) => r.groupId === g.id).length;
     if (count > 0) {
       console.log(`    ${g.name}: ${count} rules`);
     }

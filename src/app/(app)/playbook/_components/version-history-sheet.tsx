@@ -163,7 +163,7 @@ export function VersionHistorySheet({
                                   )}
                                 </div>
                                 <p className="text-muted-foreground text-xs leading-relaxed">
-                                  {r.standardPosition}
+                                  {r.standardPosition || r.description}
                                 </p>
                               </div>
                             ))}
