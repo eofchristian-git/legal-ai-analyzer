@@ -9,10 +9,10 @@ interface RuleInput {
   description: string;
   country?: string | null;
   riskLevel: string;
-  standardPosition: string;
-  acceptableRange: string;
-  escalationTrigger: string;
-  negotiationGuidance: string;
+  standardPosition?: string;
+  acceptableRange?: string;
+  escalationTrigger?: string;
+  negotiationGuidance?: string;
   groupId?: string | null;
 }
 
@@ -37,11 +37,7 @@ export async function POST(req: NextRequest) {
       if (
         !r.title?.trim() ||
         !r.description?.trim() ||
-        !r.riskLevel ||
-        !r.standardPosition?.trim() ||
-        !r.acceptableRange?.trim() ||
-        !r.escalationTrigger?.trim() ||
-        !r.negotiationGuidance?.trim()
+        !r.riskLevel
       ) {
         return NextResponse.json(
           { error: `Rule ${i + 1} ("${r.title || "untitled"}") is missing required fields` },
@@ -86,10 +82,10 @@ export async function POST(req: NextRequest) {
             country: r.country || null,
             riskLevel: r.riskLevel,
             groupId: r.groupId || null,
-            standardPosition: r.standardPosition.trim(),
-            acceptableRange: r.acceptableRange.trim(),
-            escalationTrigger: r.escalationTrigger.trim(),
-            negotiationGuidance: r.negotiationGuidance.trim(),
+            standardPosition: r.standardPosition?.trim() || null,
+            acceptableRange: r.acceptableRange?.trim() || null,
+            escalationTrigger: r.escalationTrigger?.trim() || null,
+            negotiationGuidance: r.negotiationGuidance?.trim() || null,
             createdBy: userId,
             updatedBy: userId,
           },

@@ -6,10 +6,10 @@ export interface PlaybookRuleForPrompt {
   description: string;
   country?: string | null;
   riskLevel: string;
-  standardPosition: string;
-  acceptableRange: string;
-  escalationTrigger: string;
-  negotiationGuidance: string;
+  standardPosition?: string | null;
+  acceptableRange?: string | null;
+  escalationTrigger?: string | null;
+  negotiationGuidance?: string | null;
 }
 
 export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
@@ -18,18 +18,19 @@ export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
       const country = rule.country
         ? getCountryByCode(rule.country)?.name || rule.country
         : "Global";
-      return [
+      const lines = [
         `### ${rule.title}`,
         "",
         `**Business Context**: ${rule.description}`,
         `**Jurisdiction**: ${country}`,
         `**Risk Level**: ${rule.riskLevel}`,
         "",
-        `- **Standard Position**: ${rule.standardPosition}`,
-        `- **Acceptable Range**: ${rule.acceptableRange}`,
-        `- **Escalation Trigger**: ${rule.escalationTrigger}`,
-        `- **Negotiation Guidance**: ${rule.negotiationGuidance}`,
-      ].join("\n");
+      ];
+      if (rule.standardPosition) lines.push(`- **Standard Position**: ${rule.standardPosition}`);
+      if (rule.acceptableRange) lines.push(`- **Acceptable Range**: ${rule.acceptableRange}`);
+      if (rule.escalationTrigger) lines.push(`- **Escalation Trigger**: ${rule.escalationTrigger}`);
+      if (rule.negotiationGuidance) lines.push(`- **Negotiation Guidance**: ${rule.negotiationGuidance}`);
+      return lines.join("\n");
     })
     .join("\n\n");
 }
@@ -80,9 +81,9 @@ export async function buildContractReviewPrompt(params: {
     '      "findings": [',
     '        {',
     '          "riskLevel": "GREEN|YELLOW|RED",',
-    '          "matchedRuleTitle": "string — title of the playbook rule that triggered this finding, or a descriptive title if no playbook",',
+    '          "matchedRuleTitle": "string — title of the playbook rule that triggered this finding",',
     '          "summary": "string — plain-language summary of the issue",',
-    '          "fallbackText": "string — recommended alternative contract language",',
+    '          "fallbackText": "string — recommended alternative contract language based on the playbook rule",',
     '          "whyTriggered": "string — explanation of why this rule was triggered, linking back to the specific playbook rule or standard",',
     '          "excerpt": "string — an exact, verbatim substring copied from the clauseText that triggered this finding. Must be a word-for-word match of a passage in clauseText."',
     '        }',

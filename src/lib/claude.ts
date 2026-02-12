@@ -9,21 +9,31 @@ export interface AnalysisRequest {
   userMessage: string;
   maxTokens?: number;
   model?: string;
+  /** Optional string to prefill the assistant turn (e.g. "{" to force JSON output). */
+  prefill?: string;
 }
 
 export async function analyzeWithClaude(
   request: AnalysisRequest
 ): Promise<string> {
+  const messages: { role: "user" | "assistant"; content: string }[] = [
+    {
+      role: "user",
+      content: request.userMessage,
+    },
+  ];
+
+  // Prefill forces Claude to continue from the given text, preventing code
+  // fences or preamble before JSON output.
+  if (request.prefill) {
+    messages.push({ role: "assistant", content: request.prefill });
+  }
+
   const response = await anthropic.messages.create({
     model: request.model || "claude-sonnet-4-20250514",
     max_tokens: request.maxTokens || 16384,
     system: request.systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: request.userMessage,
-      },
-    ],
+    messages,
   });
 
   // Detect truncation — if stop_reason is "max_tokens", the response was cut off
@@ -35,7 +45,10 @@ export async function analyzeWithClaude(
   }
 
   const textBlock = response.content.find((block) => block.type === "text");
-  return textBlock?.text || "";
+  const text = textBlock?.text || "";
+
+  // Prepend prefill so the caller gets the complete output
+  return request.prefill ? request.prefill + text : text;
 }
 
 export function createClaudeStream(request: AnalysisRequest) {

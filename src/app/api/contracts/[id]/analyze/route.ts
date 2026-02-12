@@ -104,7 +104,7 @@ async function runAnalysis(id: string, userId: string | null) {
     // Call Claude (non-streaming) and wait for the full response
     let fullResponse: string;
     try {
-      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384 });
+      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384, prefill: "{" });
     } catch (claudeErr) {
       console.error("Claude API error:", claudeErr);
       await db.contract.update({

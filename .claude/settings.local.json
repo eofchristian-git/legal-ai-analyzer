@@ -22,7 +22,9 @@
       "Bash(powershell:*)",
       "Bash(node -e:*)",
       "Bash(node:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "WebSearch"
     ]
   }
 }

@@ -164,10 +164,10 @@ model PlaybookRule {
   description         String
   country             String?
   riskLevel           String
-  standardPosition    String
-  acceptableRange     String
-  escalationTrigger   String
-  negotiationGuidance String
+  standardPosition    String?
+  acceptableRange     String?
+  escalationTrigger   String?
+  negotiationGuidance String?
   deleted             Boolean        @default(false)
   createdBy           String
   updatedBy           String
@@ -197,10 +197,10 @@ model PlaybookSnapshotRule {
   description         String
   country             String?
   riskLevel           String
-  standardPosition    String
-  acceptableRange     String
-  escalationTrigger   String
-  negotiationGuidance String
+  standardPosition    String?
+  acceptableRange     String?
+  escalationTrigger   String?
+  negotiationGuidance String?
   originalRuleId      String
   createdBy           String
   originalCreatedAt   DateTime

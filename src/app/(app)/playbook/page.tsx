@@ -609,13 +609,13 @@ export default function PlaybookPage() {
                                   inlineFormEditingRule.country || "",
                                 riskLevel: inlineFormEditingRule.riskLevel,
                                 standardPosition:
-                                  inlineFormEditingRule.standardPosition,
+                                  inlineFormEditingRule.standardPosition || "",
                                 acceptableRange:
-                                  inlineFormEditingRule.acceptableRange,
+                                  inlineFormEditingRule.acceptableRange || "",
                                 escalationTrigger:
-                                  inlineFormEditingRule.escalationTrigger,
+                                  inlineFormEditingRule.escalationTrigger || "",
                                 negotiationGuidance:
-                                  inlineFormEditingRule.negotiationGuidance,
+                                  inlineFormEditingRule.negotiationGuidance || "",
                               }
                             : null
                         }
