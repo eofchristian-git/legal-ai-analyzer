@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
-import { FileDropzone } from "@/components/shared/file-dropzone";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -16,230 +13,306 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, FileText, Building2 } from "lucide-react";
+import { getCountryByCode } from "@/lib/countries";
 
-export default function UploadContractPage() {
+interface Client {
+  id: string;
+  name: string;
+  country: string;
+  _count: { contracts: number };
+}
+
+interface ClientContract {
+  id: string;
+  documentId: string;
+  title: string | null;
+  createdAt: string;
+  document: {
+    id: string;
+    filename: string;
+    fileType: string;
+    fileSize: number;
+    pageCount: number;
+    createdAt: string;
+  };
+}
+
+export default function StartReviewPage() {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [pastedText, setPastedText] = useState("");
-  const [title, setTitle] = useState("");
-  const [ourSide, setOurSide] = useState("customer");
-  const [contractType, setContractType] = useState("");
-  const [counterparty, setCounterparty] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [focusAreas, setFocusAreas] = useState("");
-  const [dealContext, setDealContext] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  
+  // Step state
+  const [step, setStep] = useState<1 | 2>(1);
+  
+  // Data state
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientContracts, setClientContracts] = useState<ClientContract[]>([]);
+  
+  // Selection state
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedContractId, setSelectedContractId] = useState("");
+  
+  // Loading states
+  const [loadingClients, setLoadingClients] = useState(true);
+  const [loadingContracts, setLoadingContracts] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Load clients on mount
+  useEffect(() => {
+    fetch("/api/clients")
+      .then((r) => r.json())
+      .then((data) => setClients(Array.isArray(data) ? data : []))
+      .catch(() => toast.error("Failed to load clients"))
+      .finally(() => setLoadingClients(false));
+  }, []);
 
-    if (!file && !pastedText) {
-      toast.error("Please upload a file or paste text");
+  // Load client contracts when client selected
+  useEffect(() => {
+    if (!selectedClientId) {
+      setClientContracts([]);
       return;
     }
-    if (!title.trim()) {
-      toast.error("Please enter a title");
-      return;
-    }
 
-    setSubmitting(true);
+    setLoadingContracts(true);
+    fetch(`/api/clients/${selectedClientId}/contracts`)
+      .then((r) => r.json())
+      .then((data) => setClientContracts(Array.isArray(data) ? data : []))
+      .catch(() => toast.error("Failed to load client contracts"))
+      .finally(() => setLoadingContracts(false));
+  }, [selectedClientId]);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const selectedContract = clientContracts.find((c) => c.id === selectedContractId);
+
+  function handleNext() {
+    if (!selectedClientId) return;
+    setStep(2);
+  }
+
+  function handleBack() {
+    setStep(1);
+    setSelectedContractId("");
+  }
+
+  async function handleStartReview() {
+    if (!selectedClientId || !selectedContractId || !selectedContract) return;
+
+    setCreating(true);
     try {
-      // Step 1: Upload document
-      const formData = new FormData();
-      if (file) {
-        formData.append("file", file);
-      } else {
-        formData.append("text", pastedText);
+      const res = await fetch(
+        `/api/clients/${selectedClientId}/contracts/${selectedContractId}/review`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: selectedContract.title || selectedContract.document.filename,
+            ourSide: "customer",
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to start review");
       }
 
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json();
-        throw new Error(err.error || "Upload failed");
-      }
-
-      const doc = await uploadRes.json();
-
-      // Step 2: Create contract
-      const contractRes = await fetch("/api/contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documentId: doc.id,
-          title: title.trim(),
-          ourSide,
-          contractType: contractType || undefined,
-          counterparty: counterparty || undefined,
-          deadline: deadline || undefined,
-          focusAreas: focusAreas
-            ? JSON.stringify(focusAreas.split(",").map((s: string) => s.trim()))
-            : undefined,
-          dealContext: dealContext || undefined,
-        }),
-      });
-
-      if (!contractRes.ok) {
-        const err = await contractRes.json();
-        throw new Error(err.error || "Failed to create contract");
-      }
-
-      const contract = await contractRes.json();
-
-      // Step 3: Navigate to detail page and auto-start analysis
-      toast.success("Contract uploaded — starting analysis…");
-      router.push(`/contracts/${contract.id}?autoAnalyze=true`);
+      const data = await res.json();
+      toast.success("Review created — starting analysis…");
+      router.push(`/contracts/${data.contractId}?autoAnalyze=true`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Something went wrong"
       );
-    } finally {
-      setSubmitting(false);
+      setCreating(false);
     }
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   return (
     <div>
       <PageHeader
-        title="Upload Contract"
-        description="Upload a contract for AI-powered clause-by-clause analysis"
+        title="Start Contract Review"
+        description="Select a client and one of their contracts to create a new review"
       />
       <div className="mx-auto max-w-2xl p-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Document</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FileDropzone
-                onFileSelect={setFile}
-                onTextPaste={setPastedText}
-                selectedFile={file}
-                onClear={() => setFile(null)}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Contract Details</CardTitle>
+              <CardTitle className="text-base">Step 1: Select Client</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g., Acme Corp SaaS Agreement"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="ourSide">Our Side *</Label>
-                  <Select value={ourSide} onValueChange={setOurSide}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="vendor">Vendor</SelectItem>
-                      <SelectItem value="licensor">Licensor</SelectItem>
-                      <SelectItem value="licensee">Licensee</SelectItem>
-                      <SelectItem value="partner">Partner</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {loadingClients ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading clients...
                 </div>
-                <div>
-                  <Label htmlFor="contractType">Contract Type</Label>
-                  <Select
-                    value={contractType}
-                    onValueChange={setContractType}
+              ) : clients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Building2 className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No clients found. Create a client first to start a review.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => router.push("/clients")}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="saas">SaaS</SelectItem>
-                      <SelectItem value="services">Services</SelectItem>
-                      <SelectItem value="license">License</SelectItem>
-                      <SelectItem value="partnership">Partnership</SelectItem>
-                      <SelectItem value="procurement">Procurement</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    Go to Clients
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="client-select">
+                      Client <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={selectedClientId}
+                      onValueChange={setSelectedClientId}
+                    >
+                      <SelectTrigger id="client-select">
+                        <SelectValue placeholder="Select a client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((client) => {
+                          const country = getCountryByCode(client.country);
+                          return (
+                            <SelectItem key={client.id} value={client.id}>
+                              <span className="flex items-center gap-2">
+                                {country && <span>{country.flag}</span>}
+                                <span>{client.name}</span>
+                                <Badge variant="secondary" className="ml-1 text-xs">
+                                  {client._count.contracts}{" "}
+                                  {client._count.contracts === 1 ? "contract" : "contracts"}
+                                </Badge>
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="counterparty">Counterparty</Label>
-                  <Input
-                    id="counterparty"
-                    value={counterparty}
-                    onChange={(e) => setCounterparty(e.target.value)}
-                    placeholder="e.g., Acme Corp"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="deadline">Review Deadline</Label>
-                  <Input
-                    id="deadline"
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="focusAreas">
-                  Focus Areas (comma-separated)
-                </Label>
-                <Input
-                  id="focusAreas"
-                  value={focusAreas}
-                  onChange={(e) => setFocusAreas(e.target.value)}
-                  placeholder="e.g., liability, IP, data protection"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="dealContext">Deal Context</Label>
-                <Textarea
-                  id="dealContext"
-                  value={dealContext}
-                  onChange={(e) => setDealContext(e.target.value)}
-                  placeholder="Any additional context about this deal..."
-                  rows={3}
-                />
-              </div>
+                  <Button
+                    onClick={handleNext}
+                    disabled={!selectedClientId}
+                    className="w-full"
+                  >
+                    Next
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
+        )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            disabled={submitting}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              "Upload & Review"
-            )}
-          </Button>
-        </form>
+        {step === 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <span>Step 2: Select Contract</span>
+                {selectedClient && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    for {selectedClient.name}
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingContracts ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading contracts...
+                </div>
+              ) : clientContracts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <FileText className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    This client has no contracts yet.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Go to the client page to upload contracts first.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => router.push(`/clients/${selectedClientId}`)}
+                  >
+                    Go to Client Page
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="contract-select">
+                      Contract <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={selectedContractId}
+                      onValueChange={setSelectedContractId}
+                    >
+                      <SelectTrigger id="contract-select">
+                        <SelectValue placeholder="Select a contract" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clientContracts.map((contract) => (
+                          <SelectItem key={contract.id} value={contract.id}>
+                            <div className="flex flex-col items-start py-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">
+                                  {contract.title || contract.document.filename}
+                                </span>
+                                <Badge variant="outline" className="uppercase text-xs">
+                                  {contract.document.fileType}
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatFileSize(contract.document.fileSize)} · {contract.document.pageCount} pages · Uploaded {new Date(contract.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleBack}
+                      disabled={creating}
+                      className="gap-1"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleStartReview}
+                      disabled={!selectedContractId || creating}
+                      className="flex-1"
+                    >
+                      {creating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating Review...
+                        </>
+                      ) : (
+                        "Start Review"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

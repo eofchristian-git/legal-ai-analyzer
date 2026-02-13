@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, FileText, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { getCountryByCode } from "@/lib/countries";
 
 interface ContractRow {
   id: string;
@@ -40,6 +41,9 @@ interface ContractRow {
   status: string;
   createdAt: string;
   createdByName: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  clientCountry: string | null;
   document: { filename: string };
   analysis?: {
     overallRisk: string;
@@ -176,6 +180,7 @@ export default function ContractsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
+                <TableHead>Client</TableHead>
                 <TableHead>Our Side</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Triage</TableHead>
@@ -194,6 +199,21 @@ export default function ContractsPage() {
                     >
                       {contract.title}
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                    {contract.clientId && contract.clientName ? (
+                      <Link
+                        href={`/clients/${contract.clientId}`}
+                        className="text-sm hover:underline flex items-center gap-1.5"
+                      >
+                        {contract.clientCountry && (
+                          <span>{getCountryByCode(contract.clientCountry)?.flag}</span>
+                        )}
+                        <span>{contract.clientName}</span>
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">{contract.ourSide}</Badge>
