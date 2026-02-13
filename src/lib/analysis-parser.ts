@@ -297,23 +297,30 @@ export function parseContractAnalysis(raw: string): StructuredAnalysisResult {
   }
 
   const clauses: StructuredClause[] = (parsed.clauses || []).map(
-    (clause, index) => ({
-      clauseNumber: clause.clauseNumber || "",
-      clauseName: clause.clauseName || `Clause ${index + 1}`,
-      clauseText: clause.clauseText || "",
-      clauseTextFormatted: clause.clauseTextFormatted || clause.clauseText || "",
-      position: clause.position || index + 1,
-      findings: (clause.findings || []).map((f) => ({
-        riskLevel: (["GREEN", "YELLOW", "RED"].includes(f.riskLevel)
-          ? f.riskLevel
-          : "YELLOW") as "GREEN" | "YELLOW" | "RED",
-        matchedRuleTitle: f.matchedRuleTitle || "Unknown Rule",
-        summary: f.summary || "",
-        fallbackText: f.fallbackText || "",
-        whyTriggered: f.whyTriggered || "",
-        excerpt: typeof f.excerpt === "string" ? f.excerpt.trim() : "",
-      })),
-    })
+    (clause, index) => {
+      // Handle both old format (separate clauseText + clauseTextFormatted) 
+      // and new format (single clauseText field)
+      const clauseText = clause.clauseText || "";
+      const clauseTextFormatted = clause.clauseTextFormatted || clauseText;
+      
+      return {
+        clauseNumber: clause.clauseNumber || "", // Allow empty - UI will show position as fallback
+        clauseName: clause.clauseName || `Clause ${index + 1}`,
+        clauseText: clauseText,
+        clauseTextFormatted: clauseTextFormatted,
+        position: clause.position || index + 1,
+        findings: (clause.findings || []).map((f) => ({
+          riskLevel: (["GREEN", "YELLOW", "RED"].includes(f.riskLevel)
+            ? f.riskLevel
+            : "YELLOW") as "GREEN" | "YELLOW" | "RED",
+          matchedRuleTitle: f.matchedRuleTitle || "Unknown Rule",
+          summary: f.summary || "",
+          fallbackText: f.fallbackText || "",
+          whyTriggered: f.whyTriggered || "",
+          excerpt: typeof f.excerpt === "string" ? f.excerpt.trim() : "",
+        })),
+      };
+    }
   );
 
   // Count risk levels across all findings

@@ -60,11 +60,9 @@ export function ClauseText({ clause }: ClauseTextProps) {
       <div className="px-6 py-4 border-b bg-card shrink-0">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {clause.clauseNumber && (
-              <Badge variant="outline" className="text-xs font-mono shrink-0">
-                §{clause.clauseNumber}
-              </Badge>
-            )}
+            <Badge variant="outline" className="text-xs font-mono shrink-0">
+              {clause.clauseNumber ? `§${clause.clauseNumber}` : `#${clause.position}`}
+            </Badge>
             <h2 className="text-sm font-semibold text-foreground">{clause.clauseName}</h2>
           </div>
           {showToggle && (

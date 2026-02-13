@@ -158,7 +158,14 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                     "font-medium text-xs",
                     isSelected ? "text-foreground" : "text-muted-foreground"
                   )}>
-                    {clause.clauseNumber ? `§${clause.clauseNumber}` : clause.clauseName}
+                    {clause.clauseNumber ? (
+                      `§${clause.clauseNumber}`
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[10px] opacity-60">#{clause.position}</span>
+                        <span>{clause.clauseName}</span>
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {findingCount > 0 && (
