@@ -1,15 +1,15 @@
 <!--
   Sync Impact Report
   ──────────────────
-  Version change: N/A → 1.0.0 (initial adoption)
+  Version change: 1.0.0 → 1.1.0 (reliability enhancements)
   Added sections:
-    - Principle 1: Data Integrity
-    - Principle 2: Simplicity
-    - Principle 3: AI-Assisted, Human-Controlled
-    - Section: Technology Constraints
-    - Section: Development Workflow
-    - Governance
-  Removed sections: (none — initial version)
+    - AI Reliability Requirements (under Principle III)
+    - Data Design Patterns (new section)
+    - AI-specific limits in Technology Constraints (32K tokens, 180s timeout)
+    - Amendment Log
+  Modified sections:
+    - Technology Constraints — expanded with AI provider details
+  Removed sections: (none)
   Templates requiring updates:
     ✅ plan-template.md — Constitution Check section compatible; no changes needed
     ✅ spec-template.md — Requirements section compatible; no changes needed
