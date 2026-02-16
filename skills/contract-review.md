@@ -22,11 +22,15 @@ If no playbook is available:
 
 ### Review Process
 
+**Deviation-Focused Approach**: Extract ONLY the specific problematic passages (20-80 words) that violate playbook rules, NOT full clause text. This approach dramatically reduces token usage and focuses attention on actionable issues.
+
 1. **Identify the contract type**: SaaS agreement, professional services, license, partnership, procurement, etc. The contract type affects which clauses are most material.
 2. **Determine the user's side**: Vendor, customer, licensor, licensee, partner. This fundamentally changes the analysis (e.g., limitation of liability protections favor different parties).
 3. **Read the entire contract** before flagging issues. Clauses interact with each other (e.g., an uncapped indemnity may be partially mitigated by a broad limitation of liability).
-4. **Analyze each material clause** against the playbook position.
-5. **Consider the contract holistically**: Are the overall risk allocation and commercial terms balanced?
+4. **Analyze each material clause** against the playbook position, extracting only the problematic passages.
+5. **Provide context**: Include 30-50 words before and after each extracted passage to help reviewers understand the surrounding text.
+6. **Estimate location**: Note the approximate page number and position (top/middle/bottom) for each finding to aid navigation.
+7. **Consider the contract holistically**: Are the overall risk allocation and commercial terms balanced?
 
 ## Common Clause Analysis
 

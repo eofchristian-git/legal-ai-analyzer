@@ -101,7 +101,15 @@ async function runAnalysis(id: string, userId: string | null) {
       }
     }
 
+    // Log analysis start
+    console.log(
+      `[Analysis] Starting analysis for contract ${id} ` +
+      `(formatVersion=2, documentSize=${contract.document.extractedText.length} chars, ` +
+      `playbookRules=${hasPlaybookRules ? playbook.rules.length : 0})`
+    );
+
     // Call Claude (non-streaming) and wait for the full response
+    const startTime = Date.now();
     let fullResponse: string;
     try {
       fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 32000 });
@@ -113,13 +121,19 @@ async function runAnalysis(id: string, userId: string | null) {
       });
       return;
     }
+    const duration = Date.now() - startTime;
 
     // Parse the structured JSON response
     let parsed;
     try {
       parsed = parseContractAnalysis(fullResponse);
     } catch (parseErr) {
-      console.error("Failed to parse analysis response:", parseErr);
+      console.error(
+        `[Analyze] Failed to parse analysis response for contract ${id}:`,
+        parseErr instanceof Error ? parseErr.message : parseErr,
+        `\nResponse length: ${fullResponse.length} chars`,
+        `\nResponse preview: ${fullResponse.substring(0, 500)}...`
+      );
       await db.contract.update({
         where: { id },
         data: { status: "error" },
@@ -127,10 +141,61 @@ async function runAnalysis(id: string, userId: string | null) {
       return;
     }
 
-    // Warn if no clauses were extracted (likely truncated or bad response)
-    if (parsed.clauses.length === 0) {
+    // Lenient validation: Log warnings but accept analysis (T048a-T048d)
+    const totalFindings = parsed.clauses.reduce((sum, c) => sum + c.findings.length, 0);
+    
+    // T048d: Zero findings is a valid outcome (compliant contract)
+    if (totalFindings === 0) {
+      console.log(
+        `[Analyze] Zero findings for contract ${id} - contract appears compliant with playbook rules`
+      );
+    }
+    
+    // T048c: Warn if finding count exceeds expected limit (but accept all)
+    if (totalFindings > 100) {
       console.warn(
-        `[Analyze] No clauses extracted for contract ${id}. ` +
+        `[Analyze] Contract ${id} has ${totalFindings} findings (exceeds typical limit of 100). ` +
+        `All findings will be accepted. Consider if this is expected for a complex contract.`
+      );
+    }
+    
+    // T048a: Check for oversized excerpts (lenient - accept as-is)
+    let oversizedExcerptCount = 0;
+    for (const clause of parsed.clauses) {
+      for (const finding of clause.findings) {
+        const wordCount = finding.excerpt.split(/\s+/).length;
+        if (wordCount > 80) {
+          oversizedExcerptCount++;
+        }
+      }
+    }
+    if (oversizedExcerptCount > 0) {
+      console.warn(
+        `[Analyze] Contract ${id} has ${oversizedExcerptCount} finding(s) with excerpt >80 words. ` +
+        `Accepting as-is. Consider prompt tuning to reduce excerpt size.`
+      );
+    }
+    
+    // T048b: Check for findings with no context (lenient - accept as-is)
+    let noContextCount = 0;
+    for (const clause of parsed.clauses) {
+      for (const finding of clause.findings) {
+        if (finding.context && !finding.context.before && !finding.context.after) {
+          noContextCount++;
+        }
+      }
+    }
+    if (noContextCount > 0) {
+      console.log(
+        `[Analyze] Contract ${id} has ${noContextCount} finding(s) without context (before/after both null). ` +
+        `Accepting as-is - excerpt alone is sufficient.`
+      );
+    }
+
+    // Warn if no clauses were extracted (likely truncated or bad response)
+    if (parsed.clauses.length === 0 && totalFindings === 0) {
+      console.warn(
+        `[Analyze] No clauses or findings extracted for contract ${id}. ` +
         `Raw response length: ${fullResponse.length} chars. ` +
         `Response preview: ${fullResponse.substring(0, 300)}... ` +
         `This may indicate a truncated response, parsing issue, or formatting problem.`
@@ -203,6 +268,9 @@ async function runAnalysis(id: string, userId: string | null) {
           playbookSnapshotId: latestSnapshot?.id ?? null,
           finalized: false,
           createdBy: userId,
+          // NEW: Deviation-focused analysis fields (Feature 005)
+          formatVersion: 2,  // T041: New format with flat findings and excerpts
+          totalClauses: parsed.totalClauses || parsed.clauses.length,  // T042: Total clause count
         },
       });
 
@@ -236,6 +304,11 @@ async function runAnalysis(id: string, userId: string | null) {
               fallbackText: finding.fallbackText,
               whyTriggered: finding.whyTriggered,
               excerpt: finding.excerpt || "",
+              // NEW: Deviation-focused analysis fields (Feature 005)
+              contextBefore: finding.context?.before || null,  // T043
+              contextAfter: finding.context?.after || null,    // T044
+              locationPage: finding.location?.page || null,    // T045
+              locationPosition: finding.location?.approximatePosition || null,  // T046
             },
           });
         }
@@ -265,16 +338,15 @@ async function runAnalysis(id: string, userId: string | null) {
       data: { status: "completed" },
     });
 
-    // Count total findings
-    const totalFindings = parsed.clauses.reduce(
-      (sum, c) => sum + c.findings.length,
-      0
-    );
-
+    // T048: Log analysis completion with detailed metrics
     console.log(
-      `[Analyze] Completed for contract ${id}: ` +
-      `${parsed.clauses.length} clauses, ${totalFindings} findings, ` +
-      `risk=${parsed.overallRisk}, playbook=${hasPlaybookRules ? "yes" : "no"}`
+      `[Analysis] Completed for contract ${id}: ` +
+      `formatVersion=2, duration=${duration}ms, ` +
+      `totalClauses=${parsed.totalClauses || parsed.clauses.length}, ` +
+      `findingsCount=${totalFindings}, ` +
+      `tokensUsed=~${Math.ceil(fullResponse.length / 4)}, ` +
+      `overallRisk=${parsed.overallRisk}, ` +
+      `playbook=${hasPlaybookRules ? "yes" : "no"}`
     );
 
     // Write activity log
