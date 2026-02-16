@@ -63,6 +63,8 @@ Prompts and parsing logic MUST be maintainable and auditable.
   - Model: `claude-sonnet-4-20250514`
   - Max tokens: **32,000** (default for contract analysis)
   - API timeout: **180 seconds** (3 minutes for contract analysis)
+- **Text Processing**: Standard text diff/patch libraries (e.g., `diff-match-patch`) 
+  for tracked changes computation — selection documented in feature research.
 - **Path alias**: `@/*` maps to `./src/*`.
 
 ## Data Design Patterns
@@ -97,9 +99,14 @@ Amendments require:
 All code changes SHOULD be checked for alignment with these principles
 during review.
 
-**Version**: 1.1.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-13
+**Version**: 1.1.1 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-16
 
 ### Amendment Log
+
+**1.1.1 (2026-02-16)**: Added Text Processing section to Technology Constraints,
+clarifying that standard text diff/patch libraries are acceptable dependencies when
+justified in feature research documents. Rationale: Acknowledge diff-match-patch
+usage in Feature 006 (Clause Decision Actions) for tracked changes computation.
 
 **1.1.0 (2026-02-13)**: Added AI reliability requirements to Principle III,
 expanded Technology Constraints with AI-specific limits (32K tokens, 180s timeout),
