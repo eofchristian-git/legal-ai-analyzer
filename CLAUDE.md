@@ -43,7 +43,30 @@ Prompts are composed dynamically in `src/lib/prompts.ts` by combining:
 2. **User context** — deadline, focus areas, deal context, counterparty info
 3. **Playbook** — the organization's stored contract positions (from the Playbook DB model), appended when available
 
-Claude responses are parsed with regex in `src/lib/analysis-parser.ts` to extract structured data (clause severities, risk scores, compliance findings). Contract clauses follow the pattern `### [Clause Name] -- [GREEN|YELLOW|RED]`.
+**Prompt Optimization Strategy:**
+- Requests structured JSON output to ensure reliable parsing
+- Requests single `clauseText` field with markdown formatting (not duplicate raw+formatted text)
+- Clause numbers are optional — uses empty string `""` if unavailable, UI shows position as fallback
+- Max tokens: **32,000** (doubled from 16,384 to handle large contracts)
+- Max duration: **180 seconds** (3 minutes, up from 2 minutes)
+
+**Response Parsing:**
+Claude responses are parsed in `src/lib/analysis-parser.ts` with **4-level fallback strategy**:
+1. Direct JSON parse
+2. Regex extraction of JSON object from response
+3. Truncation repair (auto-closes brackets/braces)
+4. Return empty analysis with error logging
+
+Contract analysis uses structured JSON with clause schema:
+```typescript
+{
+  clauseNumber: string,      // Original numbering (e.g. "3.1", "Article V") or "" if missing
+  clauseName: string,         // e.g. "Limitation of Liability"
+  clauseText: string,         // Full clause with markdown formatting
+  position: number,           // Sequential 1-based index
+  findings: Finding[]         // Risk findings with GREEN/YELLOW/RED levels
+}
+```
 
 ### Database
 
@@ -62,6 +85,25 @@ Analysis records use a status lifecycle: `pending` → `analyzing` → `complete
 - **Layout**: Root layout (`src/app/layout.tsx`) wraps content in a `Sidebar` + main area with `Toaster` (sonner)
 - **Shared components** in `src/components/shared/`: `FileDropzone` (react-dropzone), `MarkdownViewer` (react-markdown + remark-gfm), `DisclaimerBanner`, `SeverityBadge`
 - **UI primitives**: shadcn/ui (New York style) in `src/components/ui/`, configured via `components.json`
+
+### Reliability Patterns
+
+**Clause Number Fallbacks:**
+Clause numbers (`clauseNumber`) are optional and may be empty strings. UI components handle this gracefully:
+- `clause-list.tsx`: Shows `#position` when `clauseNumber` is missing
+- `clause-text.tsx`: Badge always displays `§number` or `#position`
+- Never assume clause numbers are present — always provide fallback to `position` field
+
+**Token Limits & Timeouts:**
+- Contract analysis: 32K max_tokens, 180s timeout
+- Other analyses: 32K max_tokens (or as specified in request)
+- Always check for `stop_reason === "max_tokens"` to detect truncation
+- Parser handles truncated responses with auto-repair
+
+**Error Recovery:**
+- Analysis errors set contract `status: "error"` in database
+- Enhanced logging includes response preview (first 300 chars) for debugging
+- Parser returns empty analysis structure on complete failure (never throws)
 
 ### Path Aliases
 

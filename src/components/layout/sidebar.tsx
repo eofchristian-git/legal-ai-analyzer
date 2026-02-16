@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   FileText,
+  Building2,
   Shield,
   Scale,
   AlertTriangle,
@@ -21,6 +22,7 @@ import { EmagineLogo } from "@/components/shared/emagine-logo";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contracts", label: "Contract Review", icon: FileText },
+  { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/nda-triage", label: "NDA Triage", icon: Shield },
   { href: "/compliance", label: "Compliance", icon: Scale },
   { href: "/risk-assessment", label: "Risk Assessment", icon: AlertTriangle },

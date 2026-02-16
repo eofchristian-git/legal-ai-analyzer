@@ -22,6 +22,7 @@ model Document {
   ndaTriages       NdaTriage[]
   complianceChecks ComplianceCheck[]
   riskAssessments  RiskAssessment[]
+  clientContracts  ClientContract[]
 }
 
 model Contract {
@@ -38,6 +39,8 @@ model Contract {
   status        String    @default("pending")
   createdBy     String?
   createdByUser User?     @relation("ContractsCreated", fields: [createdBy], references: [id])
+  clientId      String?
+  client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -279,6 +282,40 @@ model NegotiationItem {
   createdAt   DateTime         @default(now())
 }
 
+model Client {
+  id              String    @id @default(cuid())
+  name            String
+  country         String
+  industry        String?
+  contactPerson   String?
+  contactEmail    String?
+  contactPhone    String?
+  notes           String?
+  deleted         Boolean   @default(false)
+  deletedAt       DateTime?
+  createdBy       String?
+  createdByUser   User?     @relation("ClientsCreated", fields: [createdBy], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  contracts       ClientContract[]
+  reviewContracts Contract[]
+}
+
+model ClientContract {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title       String?
+  uploadedBy  String?
+  uploadedByUser User? @relation("ClientContractsUploaded", fields: [uploadedBy], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([clientId, documentId])
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -288,10 +325,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contractsCreated    Contract[]         @relation("ContractsCreated")
-  analysesCreated     ContractAnalysis[] @relation("AnalysesCreated")
-  analysesFinalizedBy ContractAnalysis[] @relation("AnalysesFinalizedBy")
-  findingsTriagedBy   AnalysisFinding[]  @relation("FindingsTriagedBy")
-  findingComments     FindingComment[]   @relation("FindingComments")
-  activityLogs        ActivityLog[]      @relation("ActivityLogs")
+  contractsCreated           Contract[]         @relation("ContractsCreated")
+  analysesCreated            ContractAnalysis[]  @relation("AnalysesCreated")
+  analysesFinalizedBy        ContractAnalysis[]  @relation("AnalysesFinalizedBy")
+  findingsTriagedBy          AnalysisFinding[]   @relation("FindingsTriagedBy")
+  findingComments            FindingComment[]    @relation("FindingComments")
+  activityLogs               ActivityLog[]       @relation("ActivityLogs")
+  clientsCreated             Client[]            @relation("ClientsCreated")
+  clientContractsUploaded    ClientContract[]    @relation("ClientContractsUploaded")
 }

@@ -8,6 +8,7 @@ export async function GET() {
       include: {
         document: true,
         createdByUser: { select: { id: true, name: true } },
+        client: { select: { id: true, name: true, country: true } },
         analysis: {
           select: {
             id: true,
@@ -40,6 +41,10 @@ export async function GET() {
         ...contract,
         createdByName: contract.createdByUser?.name ?? null,
         createdByUser: undefined,
+        clientName: contract.client?.name ?? null,
+        clientCountry: contract.client?.country ?? null,
+        clientId: contract.client?.id ?? null,
+        client: undefined,
       };
 
       const allFindings = contract.analysis.clauses.flatMap((c: any) => c.findings);
@@ -49,6 +54,10 @@ export async function GET() {
         ...contract,
         createdByName: contract.createdByUser?.name ?? null,
         createdByUser: undefined,
+        clientName: contract.client?.name ?? null,
+        clientCountry: contract.client?.country ?? null,
+        clientId: contract.client?.id ?? null,
+        client: undefined,
         analysis: {
           ...contract.analysis,
           totalFindings: allFindings.length,

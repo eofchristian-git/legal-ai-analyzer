@@ -7,9 +7,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronRight, Plus } from "lucide-react";
+import { BookOpen, ChevronDown, Plus } from "lucide-react";
 import { RuleCard } from "./rule-card";
-import { getGroupIconConfig } from "./group-icons";
 import { cn } from "@/lib/utils";
 import type { PlaybookGroup, PlaybookRule } from "./types";
 
@@ -25,7 +24,6 @@ interface PlaybookGroupSectionProps {
   onToggleExpand: () => void;
   inlineForm: React.ReactNode | null;
   editingRuleId: string | null;
-  index: number;
 }
 
 export function PlaybookGroupSection({
@@ -40,112 +38,77 @@ export function PlaybookGroupSection({
   onToggleExpand,
   inlineForm,
   editingRuleId,
-  index,
 }: PlaybookGroupSectionProps) {
   const isCreating = inlineForm && !editingRuleId;
-  const { icon: GroupIcon, color, bg } = getGroupIconConfig(group.slug);
-  const staggerClass = `stagger-${Math.min(index + 1, 7)}`;
 
   return (
-    <div className={cn("animate-fade-up-in", staggerClass)}>
-      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-        <div
-          className={cn(
-            "rounded-lg border bg-card transition-shadow duration-200",
-            isExpanded && "shadow-sm"
-          )}
-        >
-          <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-accent/40 transition-colors text-left group/header">
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg transition-transform duration-200 group-hover/header:scale-105",
-                    bg
-                  )}
-                >
-                  <GroupIcon className={cn("h-4 w-4", color)} />
-                </div>
-                <ChevronRight
-                  className={cn(
-                    "h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200",
-                    isExpanded && "rotate-90"
-                  )}
-                />
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-semibold text-sm">{group.name}</span>
-                    <Badge
-                      variant="secondary"
-                      className="text-[11px] px-1.5 py-0 tabular-nums"
-                    >
-                      {rules.length}
-                    </Badge>
-                  </div>
-                  {group.description && (
-                    <span className="text-xs text-muted-foreground hidden sm:inline mt-0.5">
-                      {group.description}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {isExpanded && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddRule();
-                  }}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Rule
-                </Button>
-              )}
-            </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            <div className="border-t px-5 pb-4 pt-3 space-y-3">
-              {isCreating && (
-                <div className="animate-scale-fade-in">{inlineForm}</div>
-              )}
-
-              {rules.length === 0 && !inlineForm && (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No rules in this category yet. Add one.
+    <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+      <CollapsibleTrigger asChild>
+        <button className="flex items-center justify-between w-full rounded-lg border px-4 py-3 hover:bg-accent/50 transition-colors text-left">
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-semibold">{group.name}</p>
+              {group.description && (
+                <p className="text-xs text-muted-foreground">
+                  {group.description}
                 </p>
               )}
-
-              {rules.map((rule, ruleIdx) => {
-                if (editingRuleId === rule.id && inlineForm) {
-                  return (
-                    <div key={rule.id} className="animate-scale-fade-in">
-                      {inlineForm}
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    key={rule.id}
-                    className="animate-fade-up-in"
-                    style={{ animationDelay: `${ruleIdx * 40}ms` }}
-                  >
-                    <RuleCard
-                      rule={rule}
-                      isExpanded={expandedRules.has(rule.id)}
-                      onToggle={() => onToggleRule(rule.id)}
-                      onEdit={() => onEditRule(rule)}
-                      onDelete={() => onDeleteRule(rule)}
-                    />
-                  </div>
-                );
-              })}
             </div>
-          </CollapsibleContent>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="text-xs">
+              {rules.length} rules
+            </Badge>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform",
+                isExpanded && "rotate-180"
+              )}
+            />
+          </div>
+        </button>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div className="mt-2 space-y-2 pl-2">
+          {isCreating && <div>{inlineForm}</div>}
+
+          {rules.length === 0 && !inlineForm && (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No rules in this category yet. Add one.
+            </p>
+          )}
+
+          {rules.map((rule) => {
+            if (editingRuleId === rule.id && inlineForm) {
+              return <div key={rule.id}>{inlineForm}</div>;
+            }
+            return (
+              <RuleCard
+                key={rule.id}
+                rule={rule}
+                isExpanded={expandedRules.has(rule.id)}
+                onToggle={() => onToggleRule(rule.id)}
+                onEdit={() => onEditRule(rule)}
+                onDelete={() => onDeleteRule(rule)}
+              />
+            );
+          })}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-muted-foreground ml-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddRule();
+            }}
+          >
+            <Plus className="h-3 w-3" /> Add rule
+          </Button>
         </div>
-      </Collapsible>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

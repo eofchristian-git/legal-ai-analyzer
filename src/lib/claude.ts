@@ -16,7 +16,7 @@ export async function analyzeWithClaude(
 ): Promise<string> {
   const response = await anthropic.messages.create({
     model: request.model || "claude-sonnet-4-20250514",
-    max_tokens: request.maxTokens || 16384,
+    max_tokens: request.maxTokens || 32000,
     system: request.systemPrompt,
     messages: [
       {
@@ -29,7 +29,7 @@ export async function analyzeWithClaude(
   // Detect truncation — if stop_reason is "max_tokens", the response was cut off
   if (response.stop_reason === "max_tokens") {
     console.warn(
-      `[Claude] Response truncated at max_tokens (${request.maxTokens || 16384}). ` +
+      `[Claude] Response truncated at max_tokens (${request.maxTokens || 32000}). ` +
       `Model: ${response.model}, Usage: ${JSON.stringify(response.usage)}`
     );
   }
@@ -41,7 +41,7 @@ export async function analyzeWithClaude(
 export function createClaudeStream(request: AnalysisRequest) {
   return anthropic.messages.stream({
     model: request.model || "claude-sonnet-4-20250514",
-    max_tokens: request.maxTokens || 8192,
+    max_tokens: request.maxTokens || 32000,
     system: request.systemPrompt,
     messages: [
       {

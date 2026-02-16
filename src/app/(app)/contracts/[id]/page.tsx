@@ -44,17 +44,32 @@ export default function ContractDetailPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [selectedClauseId, setSelectedClauseId] = useState<string | null>(null);
-  const [showReanalyzeDialog, setShowReanalyzeDialog] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
+  const [redirecting, setRedirecting] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
+  const isRedirecting = useRef(false);
 
   const loadContract = useCallback(async () => {
     try {
       const res = await fetch(`/api/contracts/${params.id}`);
       if (res.ok) {
         const data = await res.json();
+        
+        // Check if we should redirect to wizard before setting any state
+        if (
+          data.status === "analyzing" &&
+          searchParams.get("autoAnalyze") !== "true" &&
+          searchParams.get("completed") !== "true"
+        ) {
+          // Set redirecting flags and redirect immediately
+          isRedirecting.current = true;
+          setRedirecting(true);
+          router.replace(`/contracts/upload?contractId=${data.id}&step=2`);
+          return; // Don't set any other state, just return
+        }
+        
         setContract(data);
         if (data.analysis?.clauses?.length > 0 && !selectedClauseId) {
           setSelectedClauseId(data.analysis.clauses[0].id);
@@ -64,28 +79,37 @@ export default function ContractDetailPage() {
         }
       }
     } finally {
-      setLoading(false);
+      if (!isRedirecting.current) {
+        setLoading(false);
+      }
     }
-  }, [params.id, selectedClauseId]);
+  }, [params.id, selectedClauseId, searchParams, router]);
 
   useEffect(() => {
     loadContract();
   }, [loadContract]);
 
-  // Auto-start analysis when arriving from upload page
+  // Clean up URL params and handle legacy autoAnalyze
   useEffect(() => {
-    if (
-      !loading &&
-      contract &&
-      !contract.analysis &&
-      (contract.status === "pending" || contract.status === "uploaded") &&
-      searchParams.get("autoAnalyze") === "true" &&
-      !autoAnalyzeTriggered.current &&
-      !analyzing
-    ) {
-      autoAnalyzeTriggered.current = true;
-      router.replace(`/contracts/${contract.id}`, { scroll: false });
-      startAnalysis();
+    if (!loading && contract) {
+      // Remove completed param if present
+      if (searchParams.get("completed") === "true") {
+        router.replace(`/contracts/${contract.id}`, { scroll: false });
+      }
+      
+      // Legacy: Auto-start analysis when arriving from old upload flows
+      // This is kept for backward compatibility
+      if (
+        !contract.analysis &&
+        (contract.status === "pending" || contract.status === "uploaded") &&
+        searchParams.get("autoAnalyze") === "true" &&
+        !autoAnalyzeTriggered.current &&
+        !analyzing
+      ) {
+        autoAnalyzeTriggered.current = true;
+        router.replace(`/contracts/${contract.id}`, { scroll: false });
+        startAnalysis();
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, contract, searchParams]);
@@ -136,7 +160,6 @@ export default function ContractDetailPage() {
   }
 
   async function startAnalysis() {
-    setShowReanalyzeDialog(false);
     analyzeStartTime.current = Date.now();
 
     try {
@@ -163,7 +186,8 @@ export default function ContractDetailPage() {
 
   function handleAnalyzeClick() {
     if (contract?.analysis) {
-      setShowReanalyzeDialog(true);
+      // Navigate to wizard at analyze step for re-analysis
+      router.push(`/contracts/upload?contractId=${params.id}&step=2`);
     } else {
       startAnalysis();
     }
@@ -241,7 +265,7 @@ export default function ContractDetailPage() {
     }
   }
 
-  if (loading) {
+  if (loading || redirecting) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -473,28 +497,6 @@ export default function ContractDetailPage() {
       </div>
 
       {/* Re-analysis confirmation dialog */}
-      <Dialog open={showReanalyzeDialog} onOpenChange={setShowReanalyzeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Re-analyze Contract?</DialogTitle>
-            <DialogDescription>
-              This will delete the current analysis, including all clauses,
-              findings, and triage decisions. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowReanalyzeDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={startAnalysis}>
-              Re-analyze
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -12,22 +12,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { RiskLevelBadge } from "@/components/shared/risk-level-badge";
-import { CountryFlag } from "@/components/shared/country-flag";
-import { COUNTRIES } from "@/lib/countries";
-import {
   Loader2,
   History,
   GitBranch,
   BookOpen,
   Search,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -42,7 +31,6 @@ import type {
 import { EMPTY_FORM, generateTempId } from "./_components/types";
 import { PlaybookGroupSection } from "./_components/playbook-group-section";
 import { InlineRuleForm } from "./_components/inline-rule-form";
-import { RiskLevelPills } from "./_components/risk-level-pills";
 import { StickySaveBar } from "./_components/sticky-save-bar";
 import { VersionHistorySheet } from "./_components/version-history-sheet";
 
@@ -55,8 +43,6 @@ export default function PlaybookPage() {
 
   // Filters
   const [search, setSearch] = useState("");
-  const [countryFilter, setCountryFilter] = useState("");
-  const [riskFilter, setRiskFilter] = useState("");
 
   // Inline form state
   const [inlineFormGroupId, setInlineFormGroupId] = useState<string | null>(
@@ -150,27 +136,17 @@ export default function PlaybookPage() {
 
   // Client-side filtering on draft rules
   const filteredRules = draftRules.filter((rule) => {
-    if (search) {
-      const q = search.toLowerCase();
-      if (
-        !rule.title.toLowerCase().includes(q) &&
-        !rule.description.toLowerCase().includes(q)
-      )
-        return false;
-    }
-    if (countryFilter && countryFilter !== "all" && rule.country !== countryFilter)
-      return false;
-    if (riskFilter && rule.riskLevel !== riskFilter) return false;
-    return true;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      rule.title.toLowerCase().includes(q) ||
+      rule.description.toLowerCase().includes(q)
+    );
   });
 
-  const hasFilters =
-    search ||
-    (countryFilter && countryFilter !== "all") ||
-    !!riskFilter;
+  const hasFilters = !!search;
 
   // Stats based on draft rules
-  const ruleCount = draftRules.length;
   const riskCounts = draftRules.reduce(
     (acc, r) => {
       acc[r.riskLevel] = (acc[r.riskLevel] || 0) + 1;
@@ -483,8 +459,8 @@ export default function PlaybookPage() {
               </div>
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <p className="text-lg font-semibold text-foreground">
-                    {ruleCount}
+                  <p className="text-lg font-semibold">
+                    {draftRules.length}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     Total Rules
@@ -494,11 +470,11 @@ export default function PlaybookPage() {
                   (level) =>
                     riskCounts[level] ? (
                       <div key={level} className="text-center">
-                        <p className="text-lg font-semibold text-foreground">
+                        <p className="text-lg font-semibold">
                           {riskCounts[level]}
                         </p>
-                        <p className="text-[11px]">
-                          <RiskLevelBadge level={level} size="sm" />
+                        <p className="text-[11px] text-muted-foreground">
+                          {level}
                         </p>
                       </div>
                     ) : null
@@ -508,53 +484,15 @@ export default function PlaybookPage() {
           </div>
         )}
 
-        {/* Filter Bar */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-            <Input
-              placeholder="Search rules..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={countryFilter} onValueChange={setCountryFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Countries" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Countries</SelectItem>
-              {COUNTRIES.map((c) => (
-                <SelectItem key={c.code} value={c.code}>
-                  <CountryFlag code={c.code} name={c.name} size="sm" />
-                  <span>{c.name}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <RiskLevelPills value={riskFilter} onChange={setRiskFilter} />
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearch("");
-                setCountryFilter("");
-                setRiskFilter("");
-              }}
-              className="gap-1 text-muted-foreground"
-            >
-              <X className="h-3 w-3" />
-              Clear
-            </Button>
-          )}
-          <div className="flex-1" />
-          {hasFilters && (
-            <p className="text-xs text-muted-foreground">
-              {filteredRules.length} of {ruleCount} rules
-            </p>
-          )}
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search rules..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
         {/* Grouped Rules */}
@@ -571,8 +509,8 @@ export default function PlaybookPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3 pb-24">
-            {groups.map((group, groupIdx) => {
+          <div className="space-y-4 pb-24">
+            {groups.map((group) => {
               const groupRules = rulesByGroup.get(group.id) || [];
               // Hide empty groups when filtering (unless inline form is open for it)
               if (
@@ -587,7 +525,6 @@ export default function PlaybookPage() {
                 <PlaybookGroupSection
                   key={group.id}
                   group={group}
-                  index={groupIdx}
                   rules={groupRules}
                   expandedRules={expandedRules}
                   onToggleRule={toggleRule}

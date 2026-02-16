@@ -5,7 +5,7 @@ import { analyzeWithClaude } from "@/lib/claude";
 import { parseContractAnalysis } from "@/lib/analysis-parser";
 import { getSessionOrUnauthorized } from "@/lib/auth-utils";
 
-export const maxDuration = 120; // Allow up to 2 minutes for Claude to respond
+export const maxDuration = 180; // Allow up to 3 minutes for Claude to respond
 
 /**
  * Run the actual analysis work in the background.
@@ -104,7 +104,7 @@ async function runAnalysis(id: string, userId: string | null) {
     // Call Claude (non-streaming) and wait for the full response
     let fullResponse: string;
     try {
-      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 16384 });
+      fullResponse = await analyzeWithClaude({ systemPrompt, userMessage, maxTokens: 32000 });
     } catch (claudeErr) {
       console.error("Claude API error:", claudeErr);
       await db.contract.update({
@@ -132,7 +132,8 @@ async function runAnalysis(id: string, userId: string | null) {
       console.warn(
         `[Analyze] No clauses extracted for contract ${id}. ` +
         `Raw response length: ${fullResponse.length} chars. ` +
-        `This may indicate a truncated response (max_tokens too low) or a parsing issue.`
+        `Response preview: ${fullResponse.substring(0, 300)}... ` +
+        `This may indicate a truncated response, parsing issue, or formatting problem.`
       );
     }
 
