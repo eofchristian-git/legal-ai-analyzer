@@ -2,6 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  // Set timeout to 3 minutes (180 seconds) to match maxDuration in API route
+  // Prevents "Streaming is required for operations that may take longer than 10 minutes" error
+  timeout: 180 * 1000, // 180 seconds in milliseconds
 });
 
 export interface AnalysisRequest {

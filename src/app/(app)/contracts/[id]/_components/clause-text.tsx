@@ -11,7 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FileText, Highlighter, BookOpen } from "lucide-react";
+import { FileText, Highlighter, BookOpen, MapPin } from "lucide-react";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding } from "./types";
 
@@ -28,6 +28,8 @@ const riskLabel: Record<string, string> = {
 type ViewMode = "formatted" | "highlights";
 
 export function ClauseText({ clause }: ClauseTextProps) {
+  // Detect format: v1 has clauseText, v2 has empty clauseText with context fields
+  const isLegacyFormat = !!clause?.clauseText && clause.clauseText.length > 0;
   const hasFormatted = !!clause?.clauseTextFormatted;
   const hasExcerpts = !!clause?.findings.some((f) => f.excerpt);
   const [viewMode, setViewMode] = useState<ViewMode>(
@@ -53,7 +55,7 @@ export function ClauseText({ clause }: ClauseTextProps) {
       rule: f.matchedRuleTitle,
     }));
 
-  const showToggle = hasFormatted && hasExcerpts;
+  const showToggle = hasFormatted && hasExcerpts && isLegacyFormat;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -91,13 +93,100 @@ export function ClauseText({ clause }: ClauseTextProps) {
       </div>
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-6 py-5">
-          {viewMode === "formatted" && hasFormatted ? (
-            <MarkdownViewer content={clause.clauseTextFormatted!} />
+          {isLegacyFormat ? (
+            // Format v1: Show full clause text with optional highlighting
+            viewMode === "formatted" && hasFormatted ? (
+              <MarkdownViewer content={clause.clauseTextFormatted!} />
+            ) : (
+              <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
+            )
           ) : (
-            <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
+            // Format v2: Show findings with excerpt + context
+            <DeviationFocusedView findings={clause.findings} />
           )}
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// Format v2: Deviation-focused view with excerpts + context
+function DeviationFocusedView({ findings }: { findings: Finding[] }) {
+  if (findings.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        No findings for this clause
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {findings.map((finding) => (
+        <div key={finding.id} className="space-y-2">
+          {/* Location badge */}
+          {finding.locationPage && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" />
+              <span>
+                Page {finding.locationPage}
+                {finding.locationPosition && ` (${finding.locationPosition})`}
+              </span>
+            </div>
+          )}
+
+          {/* Context before (muted) */}
+          {finding.contextBefore && (
+            <p className="text-sm leading-6 text-muted-foreground italic">
+              ...{finding.contextBefore}
+            </p>
+          )}
+
+          {/* Excerpt (highlighted) */}
+          <div
+            className={cn(
+              "rounded-md px-4 py-3 border-l-4",
+              finding.riskLevel === "RED"
+                ? "bg-risk-red-soft border-risk-red"
+                : finding.riskLevel === "YELLOW"
+                ? "bg-risk-yellow-soft border-risk-yellow"
+                : "bg-risk-green-soft border-risk-green"
+            )}
+          >
+            <p className="text-sm leading-6 font-medium text-foreground">
+              {finding.excerpt}
+            </p>
+          </div>
+
+          {/* Context after (muted) */}
+          {finding.contextAfter && (
+            <p className="text-sm leading-6 text-muted-foreground italic">
+              {finding.contextAfter}...
+            </p>
+          )}
+
+          {/* Finding details */}
+          <div className="flex items-start gap-2 pt-1">
+            <Badge
+              variant="outline"
+              className={cn(
+                "shrink-0 text-xs",
+                finding.riskLevel === "RED"
+                  ? "bg-risk-red-soft text-risk-red border-risk-red-border"
+                  : finding.riskLevel === "YELLOW"
+                  ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border"
+                  : "bg-risk-green-soft text-risk-green border-risk-green-border"
+              )}
+            >
+              {riskLabel[finding.riskLevel]}
+            </Badge>
+            <div className="flex-1 space-y-1">
+              <p className="text-xs font-medium text-foreground">{finding.summary}</p>
+              <p className="text-[10px] text-muted-foreground">{finding.matchedRuleTitle}</p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

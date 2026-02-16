@@ -22,6 +22,7 @@ import {
   Search,
   Send,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -269,6 +270,17 @@ function FindingCard({
           </Badge>
         )}
       </div>
+
+      {/* Location (v2 format only) */}
+      {finding.locationPage && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <MapPin className="h-3 w-3" />
+          <span>
+            Page {finding.locationPage}
+            {finding.locationPosition && ` (${finding.locationPosition})`}
+          </span>
+        </div>
+      )}
 
       {/* Rule + Summary */}
       <div>

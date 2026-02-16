@@ -3,11 +3,21 @@
 **Feature ID**: 005-deviation-focused-analysis  
 **Status**: Draft  
 **Created**: 2026-02-13  
-**Last Updated**: 2026-02-13
+**Last Updated**: 2026-02-16
 
 ## Overview
 
 Transform contract analysis from extracting full clause text to extracting only problematic deviations. This reduces token usage by ~90%, eliminates truncation issues on large contracts, and creates a foundation for a future document viewer with precise highlighting.
+
+## Clarifications
+
+### Session 2026-02-16
+
+- Q: If Claude returns an excerpt that exceeds 80 words (e.g., 100 words), what should the API do? → A: Accept the excerpt as-is and log a warning (lenient validation)
+- Q: If Claude returns a finding where BOTH context.before and context.after are null (no context at all), what should the API do? → A: Accept the finding and display excerpt alone without context
+- Q: If Claude returns 120 findings for a single contract (exceeding the 100 finding limit), what should the API do? → A: Accept all findings and log a warning about exceeding expected limit
+- Q: During deployment, if an analysis is currently in progress (status="analyzing"), should it complete as formatVersion=1 or formatVersion=2? → A: Complete as formatVersion=1 (old format) - analyses in progress use old prompt/parser
+- Q: If Claude returns an empty findings array (0 findings) for a contract, is this considered a successful analysis or an error condition? → A: Successful analysis - contract is compliant (0 findings is valid)
 
 ## Problem Statement
 
@@ -111,6 +121,14 @@ Transform contract analysis from extracting full clause text to extracting only 
 - ✅ No finding exceeds 150 words total
 - ✅ `clauseText` field is no longer in response
 
+**Validation Behavior**:
+- Excerpt length 20-80 words is a guideline, not a hard constraint
+- API accepts excerpts >80 words and logs warning for monitoring
+- No automatic truncation or rejection of oversized excerpts
+- Context fields (before/after) are optional; findings accepted even if both are null
+- Excerpt alone is sufficient for display; context enhances understanding but is not required
+- Finding count limits (100 per contract) are soft limits; excess findings are accepted and logged
+
 ### FR-2: Flat Finding Structure
 
 **Description**: Findings are returned as flat list, not grouped by clause
@@ -120,12 +138,19 @@ Transform contract analysis from extracting full clause text to extracting only 
 - Each finding includes full clause reference
 - Findings ordered by severity (RED → YELLOW → GREEN)
 - Findings within same severity ordered by position
+- Empty findings array (0 findings) is a valid successful outcome indicating contract compliance
 
 **Acceptance Criteria**:
 - ✅ Response has `findings: []` at top level
 - ✅ No `clauses: []` array in response
 - ✅ Each finding has `clauseReference` object
 - ✅ Findings are properly sorted
+- ✅ Analysis with 0 findings completes successfully with status="completed"
+
+**Edge Case Handling**:
+- Zero findings: Treated as successful analysis (contract is compliant with playbook rules)
+- UI displays positive message: "No issues found - contract appears compliant"
+- Not treated as error or suspicious condition requiring retry
 
 ### FR-3: Location Metadata
 
@@ -151,12 +176,19 @@ Transform contract analysis from extracting full clause text to extracting only 
 - Parser handles both old (clause-grouped) and new (flat) formats
 - UI displays both old and new format analyses
 - Migration script available to upgrade old analyses
+- In-progress analyses during deployment complete as formatVersion=1 (no mid-flight format change)
 
 **Acceptance Criteria**:
 - ✅ Old analyses display correctly in UI
 - ✅ New analyses use new format
 - ✅ No data loss during migration
 - ✅ Users see no disruption
+- ✅ In-progress analyses at deployment time complete successfully with old format
+
+**Deployment Behavior**:
+- Analyses with status="analyzing" at deployment time use old prompt/parser (formatVersion=1)
+- Only new analyses started after deployment use new format (formatVersion=2)
+- Clean separation prevents parser failures during rollout
 
 ### FR-5: Token Efficiency
 
@@ -246,14 +278,17 @@ interface ContractAnalysis {
 
 ### Scalability
 - Support contracts up to 500 clauses
-- Support up to 100 findings per contract
+- Support up to 100 findings per contract (soft limit; higher counts accepted with warning)
 - No truncation on large contracts
 - Graceful degradation if limits exceeded
+- Findings exceeding 100 are logged but not rejected; UI should handle pagination
 
 ### Reliability
 - Parser handles both old and new formats
 - Missing location data doesn't break UI
-- Empty context fields display gracefully
+- Empty context fields display gracefully (findings shown with excerpt only)
+- Missing context (both before/after null) does not reject findings
+- Zero findings is a valid successful outcome (contract compliant)
 - Migration script is idempotent
 
 ## Future Enhancements
@@ -327,6 +362,7 @@ interface ContractAnalysis {
 3. Must complete migration within 1 sprint
 4. Should not require database schema changes that break prod
 5. Parser must handle both formats indefinitely
+6. In-progress analyses during deployment must complete without disruption (use old format)
 
 ## Dependencies
 

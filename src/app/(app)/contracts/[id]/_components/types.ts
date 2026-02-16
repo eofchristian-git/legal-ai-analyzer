@@ -23,6 +23,11 @@ export interface Finding {
   triagedByName: string | null;
   triagedAt: string | null;
   comments: FindingComment[];
+  // NEW: Deviation-focused analysis fields (Feature 005)
+  contextBefore?: string | null;    // T051: Text before the excerpt
+  contextAfter?: string | null;     // T052: Text after the excerpt
+  locationPage?: number | null;     // T053: Approximate page number
+  locationPosition?: string | null; // T054: Approximate position (top/middle/bottom)
 }
 
 export interface Clause {
@@ -65,6 +70,9 @@ export interface AnalysisWithClauses {
   modelUsed: string;
   createdAt: string;
   clauses: Clause[];
+  // NEW: Deviation-focused analysis fields (Feature 005)
+  formatVersion?: number;   // 1 = old clause-based, 2 = new deviation-based
+  totalClauses?: number;    // Total clauses in document (v2 only)
 }
 
 export interface ContractWithAnalysis {

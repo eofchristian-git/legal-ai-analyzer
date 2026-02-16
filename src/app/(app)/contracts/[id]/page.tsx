@@ -386,7 +386,7 @@ export default function ContractDetailPage() {
                   redCount={redCount}
                   yellowCount={yellowCount}
                   greenCount={greenCount}
-                  clauseCount={analysis.clauses.length}
+                  clauseCount={analysis.totalClauses || analysis.clauses.length}
                   triagedCount={triagedCount}
                   totalFindings={totalFindings}
                   playbookVersion={analysis.playbookVersion}

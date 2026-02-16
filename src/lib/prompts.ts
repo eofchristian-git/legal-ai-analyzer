@@ -35,6 +35,29 @@ export function serializePlaybookRules(rules: PlaybookRuleForPrompt[]): string {
     .join("\n\n");
 }
 
+/**
+ * Build a contract review prompt for Claude.
+ * 
+ * Feature 005: Deviation-Focused Analysis
+ * 
+ * This prompt requests Claude to extract ONLY problematic 20-80 word excerpts
+ * (not full clause text) to achieve ~85% token reduction.
+ * 
+ * The response format is a flat findings array with:
+ * - `excerpt`: 20-80 words of the problematic passage (verbatim)
+ * - `context`: 30-50 words before and after for understanding
+ * - `location`: Approximate page number and position (top/middle/bottom)
+ * - `clauseReference`: Embedded clause metadata (number, name, position)
+ * - `totalClauses`: Total clause count in the document
+ * 
+ * Benefits:
+ * - Token usage: 15K → <3K per analysis (85% reduction)
+ * - Scalability: Supports 500+ clause contracts (vs 50 previously)
+ * - UX: Users see exact problematic passages, not full 500-word clauses
+ * 
+ * @param params - Prompt parameters including contract text and playbook rules
+ * @returns System prompt and user message for Claude API
+ */
 export async function buildContractReviewPrompt(params: {
   contractText: string;
   ourSide: string;
@@ -64,7 +87,9 @@ export async function buildContractReviewPrompt(params: {
 
   parts.push("", "## Contract Text", "", params.contractText, "", "---", "");
   parts.push(
-    "Analyze the contract clause by clause. For each clause, identify findings against the playbook rules (or general best practices if no playbook is provided).",
+    "Analyze the contract and identify ONLY the specific problematic passages that violate playbook rules (or general best practices if no playbook is provided).",
+    "",
+    "**IMPORTANT: Extract only problematic excerpts (20-80 words each), NOT full clause text. This dramatically reduces token usage.**",
     "",
     "You MUST respond with ONLY a valid JSON object (no markdown, no code fences, no explanation outside the JSON). Use this exact schema:",
     "",
@@ -72,22 +97,28 @@ export async function buildContractReviewPrompt(params: {
     '{',
     '  "executiveSummary": "string — 2-3 sentence overview of the contract risk posture",',
     '  "overallRisk": "low|medium|high",',
-    '  "clauses": [',
+    '  "totalClauses": 0,',
+    '  "findings": [',
     '    {',
-    '      "clauseNumber": "string — the original section/article/clause number as it appears in the document (e.g. \"3.1\", \"Article 5\", \"Section 12\", \"§7\"). Use \"\" if the document has no numbering or if unclear.",',
-    '      "clauseName": "string — name/title of the clause (e.g. Limitation of Liability)",',
-    '      "clauseText": "string — the FULL clause text with clean markdown formatting for readability. Use paragraph breaks, sub-section headers (###), numbered/bulleted lists where appropriate, and **bold** for defined terms. Include all substantive content without omitting material terms.",',
-    '      "position": 1,',
-    '      "findings": [',
-    '        {',
-    '          "riskLevel": "GREEN|YELLOW|RED",',
-    '          "matchedRuleTitle": "string — title of the playbook rule that triggered this finding",',
-    '          "summary": "string — plain-language summary of the issue",',
-    '          "fallbackText": "string — recommended alternative contract language based on the playbook rule",',
-    '          "whyTriggered": "string — explanation of why this rule was triggered, linking back to the specific playbook rule or standard",',
-    '          "excerpt": "string — an exact, verbatim substring copied from the clauseText that triggered this finding. Must be a word-for-word match of a passage in clauseText."',
-    '        }',
-    '      ]',
+    '      "clauseReference": {',
+    '        "number": "string — the original section/article/clause number (e.g. \"3.1\", \"Article 5\"). Use \"\" if no numbering.",',
+    '        "name": "string — name/title of the clause (e.g. Limitation of Liability)",',
+    '        "position": 1',
+    '      },',
+    '      "excerpt": "string — ONLY the 20-80 word problematic passage that triggered this finding. Must be verbatim from the contract.",',
+    '      "context": {',
+    '        "before": "string — 30-50 words of text BEFORE the excerpt for understanding. Can be null if at document start.",',
+    '        "after": "string — 30-50 words of text AFTER the excerpt for understanding. Can be null if at document end."',
+    '      },',
+    '      "location": {',
+    '        "page": 0,',
+    '        "approximatePosition": "top|middle|bottom — where on the page this excerpt appears. Can be null if unknown."',
+    '      },',
+    '      "riskLevel": "GREEN|YELLOW|RED",',
+    '      "matchedRuleTitle": "string — title of the playbook rule that triggered this finding",',
+    '      "summary": "string — plain-language summary of the issue",',
+    '      "fallbackText": "string — recommended alternative contract language based on the playbook rule",',
+    '      "whyTriggered": "string — explanation of why this rule was triggered"',
     '    }',
     '  ],',
     '  "negotiationStrategy": [',
@@ -101,16 +132,30 @@ export async function buildContractReviewPrompt(params: {
     '}',
     '```',
     "",
-    "Rules:",
-    "- clauseNumber: Extract the original numbering exactly as it appears. Look for patterns like '1.', '1.1', 'Article I', 'Section 1', 'Clause 1', '(a)', 'ARTICLE I', etc. Return empty string \"\" if the document has no visible numbering or if uncertain.",
-    "- Position values must be sequential starting at 1.",
-    "- Every clause must appear even if it has zero findings (empty findings array).",
-    "- clauseText must contain the complete clause content with markdown formatting for readability (paragraph breaks, headers, lists, bold terms). Do not truncate or omit material provisions.",
-    "- riskLevel for findings must be exactly GREEN, YELLOW, or RED.",
-    "- overallRisk must be exactly low, medium, or high.",
-    "- excerpt MUST be an exact, verbatim substring from the clauseText for that clause. Do NOT paraphrase or summarize — copy the triggering passage word-for-word.",
-    "- negotiationStrategy MUST be a JSON array of priority items, NOT a string. Each item must have priority (P1/P2/P3), title, description, and optionally clauseRef.",
-    "- Respond with ONLY the JSON object, nothing else."
+    "Critical Rules:",
+    "- **DO NOT extract full clause text** - this violates the token efficiency requirement.",
+    "- **Extract ONLY problematic passages**: Each excerpt should be 20-80 words of the specific text that violates a rule.",
+    "- **Provide context**: Include 30-50 words before and after the excerpt so readers understand the surrounding text.",
+    "- **Estimate location**: Provide approximate page number and position (top/middle/bottom) if determinable from the document structure.",
+    "- **Count all clauses**: Set totalClauses to the total number of distinct clauses/sections you identified in the document.",
+    "- **Flat findings list**: Return findings as a top-level array, NOT grouped under clauses. Each finding must include its clauseReference.",
+    "- **Position values**: Within clauseReference, position must be sequential starting at 1.",
+    "- **Risk levels**: riskLevel must be exactly GREEN, YELLOW, or RED.",
+    "- **Overall risk**: overallRisk must be exactly low, medium, or high.",
+    "- **Excerpt accuracy**: excerpt MUST be verbatim from the contract. Do NOT paraphrase.",
+    "- **Negotiation strategy**: MUST be a JSON array of priority items with structure shown above.",
+    "- **Response format**: Respond with ONLY the JSON object, nothing else.",
+    "",
+    "Example of a good excerpt + context:",
+    '- excerpt: "Vendor liability shall be limited to €100 regardless of the nature or severity of the claim"',
+    '- context.before: "The parties agree that all services are provided as-is without warranty."',
+    '- context.after: "This limitation applies to all claims including breach of contract, negligence, or statutory violations."',
+    "",
+    "Example of what NOT to do:",
+    "- ❌ Extracting 500+ words of full clause text",
+    "- ❌ Paraphrasing the excerpt instead of copying verbatim",
+    "- ❌ Grouping findings under a clauses array",
+    "- ❌ Omitting context or location fields"
   );
 
   return { systemPrompt, userMessage: parts.join("\n") };

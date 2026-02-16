@@ -74,6 +74,10 @@ model ContractAnalysis {
   createdBy           String?
   createdByUser       User?             @relation("AnalysesCreated", fields: [createdBy], references: [id])
   createdAt           DateTime          @default(now())
+  
+  // NEW: Deviation-focused analysis fields (Feature 005)
+  formatVersion       Int               @default(1)  // 1 = old clause-based, 2 = new deviation-based
+  totalClauses        Int               @default(0)  // Total clauses in document (v2 only)
 
   clauses           AnalysisClause[]
   negotiationItems  NegotiationItem[]
@@ -216,7 +220,7 @@ model AnalysisClause {
   analysis     ContractAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
   clauseNumber String           @default("")
   clauseName          String
-  clauseText          String
+  clauseText          String?    // Made optional for formatVersion=2 (Feature 005)
   clauseTextFormatted String?
   position            Int
   createdAt    DateTime         @default(now())
@@ -243,6 +247,12 @@ model AnalysisFinding {
   triagedByUser    User?          @relation("FindingsTriagedBy", fields: [triagedBy], references: [id])
   triagedAt        DateTime?
   createdAt        DateTime       @default(now())
+  
+  // NEW: Deviation-focused analysis fields (Feature 005)
+  contextBefore    String?        // Text before the excerpt for understanding
+  contextAfter     String?        // Text after the excerpt for understanding
+  locationPage     Int?           // Approximate page number in document
+  locationPosition String?        // Approximate position: "top" | "middle" | "bottom"
 
   comments FindingComment[]
 }
