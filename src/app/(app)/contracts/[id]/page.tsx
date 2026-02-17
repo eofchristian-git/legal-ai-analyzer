@@ -260,27 +260,49 @@ export default function ContractDetailPage() {
   // Feature 008: Fetch document data for document viewer
   useEffect(() => {
     const fetchDocument = async () => {
+      console.log('[DocumentFetch] Starting fetch...', {
+        hasContract: !!contract,
+        hasAnalysis: !!contract?.analysis,
+        clauseCount: contract?.analysis?.clauses?.length || 0,
+        contractId: params.id,
+      });
+
       if (!contract?.analysis || contract.analysis.clauses.length === 0) {
+        console.log('[DocumentFetch] Skipping: No analysis or clauses');
         setDocumentData(null);
         return;
       }
 
       try {
         const response = await fetch(`/api/contracts/${params.id}/document`);
+        console.log('[DocumentFetch] Response:', response.status, response.statusText);
+        
         if (response.ok) {
           const data = await response.json();
+          console.log('[DocumentFetch] Data received:', {
+            success: data.success,
+            hasHtmlContent: !!data.document?.htmlContent,
+            htmlLength: data.document?.htmlContent?.length || 0,
+            pageCount: data.document?.pageCount,
+            clausePositionsCount: data.document?.clausePositions?.length || 0,
+            findingPositionsCount: data.document?.findingPositions?.length || 0,
+          });
+          
           setDocumentData(data.document);
           // Enable document view mode if document is available
           if (data.document?.htmlContent) {
+            console.log('[DocumentFetch] Setting view mode to document');
             setDocumentViewMode('document');
           }
         } else {
+          const errorData = await response.json();
+          console.log('[DocumentFetch] Error response:', errorData);
           // Document not ready yet, stay in clause view mode
           setDocumentData(null);
           setDocumentViewMode('clause');
         }
       } catch (error) {
-        console.error('Failed to fetch document:', error);
+        console.error('[DocumentFetch] Exception:', error);
         setDocumentData(null);
         setDocumentViewMode('clause');
       }
@@ -580,24 +602,31 @@ export default function ContractDetailPage() {
                 <ResizablePanel defaultSize="45%" minSize="25%">
                   <div className="h-full overflow-hidden flex flex-col">
                     {/* View mode toggle */}
-                    {documentData?.htmlContent && (
-                      <div className="p-2 border-b flex gap-2">
-                        <Button
-                          variant={documentViewMode === 'clause' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setDocumentViewMode('clause')}
-                        >
-                          Clause View
-                        </Button>
-                        <Button
-                          variant={documentViewMode === 'document' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setDocumentViewMode('document')}
-                        >
-                          Document View
-                        </Button>
-                      </div>
-                    )}
+                    {(() => {
+                      console.log('[ButtonsRender] documentData:', {
+                        exists: !!documentData,
+                        hasHtmlContent: !!documentData?.htmlContent,
+                        htmlLength: documentData?.htmlContent?.length || 0,
+                      });
+                      return documentData?.htmlContent && (
+                        <div className="p-2 border-b flex gap-2">
+                          <Button
+                            variant={documentViewMode === 'clause' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setDocumentViewMode('clause')}
+                          >
+                            Clause View
+                          </Button>
+                          <Button
+                            variant={documentViewMode === 'document' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setDocumentViewMode('document')}
+                          >
+                            Document View
+                          </Button>
+                        </div>
+                      );
+                    })()}
                     
                     {/* Render based on view mode */}
                     {documentViewMode === 'document' && documentData?.htmlContent ? (
