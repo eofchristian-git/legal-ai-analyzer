@@ -97,6 +97,34 @@ export async function POST(
           { status: 400 }
         );
       }
+      
+      // T052: Validate assigneeId has APPROVE_ESCALATIONS permission
+      const assignee = await db.user.findUnique({
+        where: { id: escalatePayload.assigneeId },
+        select: { id: true, role: true },
+      });
+      
+      if (!assignee) {
+        return NextResponse.json(
+          { error: 'Assignee user not found' },
+          { status: 400 }
+        );
+      }
+      
+      // Check if assignee has APPROVE_ESCALATIONS permission
+      const hasApprovalPermission = await db.rolePermission.findFirst({
+        where: {
+          role: assignee.role,
+          permission: 'APPROVE_ESCALATIONS',
+        },
+      });
+      
+      if (!hasApprovalPermission && assignee.role !== 'admin') {
+        return NextResponse.json(
+          { error: 'Assignee does not have approval permissions' },
+          { status: 400 }
+        );
+      }
     } else if (actionType === DecisionActionType.ADD_NOTE) {
       const notePayload = payload as any;
       if (!notePayload.noteText) {

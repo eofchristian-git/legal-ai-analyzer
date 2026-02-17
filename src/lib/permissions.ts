@@ -42,12 +42,10 @@ export async function hasPermission(
   }
 
   // Check RolePermission table for explicit permission mapping
-  const rolePermission = await db.rolePermission.findUnique({
+  const rolePermission = await db.rolePermission.findFirst({
     where: {
-      role_permission: {
-        role: user.role,
-        permission: permission,
-      },
+      role: user.role,
+      permission: permission,
     },
   });
 

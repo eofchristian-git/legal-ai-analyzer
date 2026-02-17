@@ -12,7 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FileText, Highlighter, BookOpen, MapPin, Save, X } from "lucide-react";
+import { FileText, Highlighter, BookOpen, MapPin, Save, X, AlertTriangle } from "lucide-react";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding } from "./types";
 import { ClauseStatus, TrackedChange } from "@/types/decisions";
@@ -27,6 +27,8 @@ interface ClauseTextProps {
   effectiveText?: string | null;          // T048: The current effective text for editing
   onEditModeChange?: (isEdit: boolean) => void;  // T048: Callback to toggle edit mode
   onDecisionApplied?: () => void;         // T048: Callback after save
+  escalatedToUserName?: string | null;    // T059: Show assignee name for escalated clauses
+  hasUnresolvedEscalation?: boolean;      // T060: Show locked state
 }
 
 const riskLabel: Record<string, string> = {
@@ -45,6 +47,8 @@ export function ClauseText({
   effectiveText,
   onEditModeChange,
   onDecisionApplied,
+  escalatedToUserName,
+  hasUnresolvedEscalation,
 }: ClauseTextProps) {
   // Detect format: v1 has clauseText, v2 has empty clauseText with context fields
   const isLegacyFormat = !!clause?.clauseText && clause.clauseText.length > 0;
@@ -170,6 +174,13 @@ export function ClauseText({
               </Badge>
             )}
             
+            {/* T059: Show assignee name for escalated clauses */}
+            {effectiveStatus === 'ESCALATED' && escalatedToUserName && (
+              <span className="text-xs text-muted-foreground italic">
+                (awaiting {escalatedToUserName})
+              </span>
+            )}
+            
             {/* T027: "Accepted deviation (playbook override)" tag */}
             {effectiveStatus === 'ACCEPTED' && (
               <span className="text-xs text-muted-foreground italic">
@@ -203,6 +214,23 @@ export function ClauseText({
       </div>
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-6 py-5 space-y-6">
+          {/* T060: Locked State UI - Show when clause is escalated */}
+          {hasUnresolvedEscalation && escalatedToUserName && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-900">
+                    Awaiting decision from {escalatedToUserName}
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    This clause has been escalated. Only the assigned approver or an admin can make decisions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* T048: Inline Editor Mode */}
           {isEditMode ? (
             <div className="space-y-4">

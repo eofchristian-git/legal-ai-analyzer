@@ -196,6 +196,7 @@ export function FindingsPanel({
                 </p>
                 <DecisionButtons
                   clauseId={clause.id}
+                  clauseName={clause.clauseName}
                   projection={projection}
                   findings={clause.findings}
                   onDecisionApplied={onDecisionApplied}

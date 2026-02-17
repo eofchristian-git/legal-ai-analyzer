@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DecisionActionType, ProjectionResult } from '@/types/decisions';
+import { EscalateModal } from './escalate-modal';  // T056: Feature 006
 
 interface Finding {
   id: string;
@@ -37,6 +38,7 @@ interface Finding {
 
 interface DecisionButtonsProps {
   clauseId: string;
+  clauseName?: string;  // T056: Clause name for escalation modal
   projection?: ProjectionResult | null;
   findings: Finding[];  // T033: Need findings to access fallback language
   onDecisionApplied?: () => void;  // Callback to refresh clause data after decision
@@ -45,12 +47,15 @@ interface DecisionButtonsProps {
 
 export function DecisionButtons({
   clauseId,
+  clauseName = 'this clause',
   projection,
   findings,
   onDecisionApplied,
   onEditManualClick,
 }: DecisionButtonsProps) {
   const [isLoading, setIsLoading] = useState(false);
+  // T056: Escalate modal state
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
 
   // T038: Check if fallback language is available
   const hasFallbackLanguage = findings.some((f) => f.fallbackText && f.fallbackText.trim().length > 0);
@@ -280,7 +285,7 @@ export function DecisionButtons({
       </Button>
 
       <Button
-        onClick={() => toast.info('Escalate - Phase 7')}
+        onClick={() => setEscalateModalOpen(true)}
         disabled={isButtonsDisabled}
         variant="outline"
         size="sm"
@@ -331,6 +336,17 @@ export function DecisionButtons({
           </p>
         </div>
       )}
+
+      {/* T056: Escalate Modal */}
+      <EscalateModal
+        open={escalateModalOpen}
+        onOpenChange={setEscalateModalOpen}
+        clauseId={clauseId}
+        clauseName={clauseName}
+        onEscalated={() => {
+          onDecisionApplied?.();
+        }}
+      />
     </div>
   );
 }

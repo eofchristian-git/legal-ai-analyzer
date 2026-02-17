@@ -467,6 +467,8 @@ export default function ContractDetailPage() {
                         setHistoryRefreshKey((k) => k + 1);
                         setTimelineRefreshKey((k) => k + 1);
                       }}
+                      escalatedToUserName={projection?.escalatedToUserName}
+                      hasUnresolvedEscalation={projection?.hasUnresolvedEscalation}
                     />
                   </div>
                 </ResizablePanel>

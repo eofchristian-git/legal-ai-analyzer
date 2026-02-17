@@ -166,18 +166,18 @@
 
 ### API Implementation for US4
 
-- [ ] T052 [US4] Add ESCALATE handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate reason, comment, assigneeId, create ClauseDecision, invalidate cache
-- [ ] T053 [US4] Update canMakeDecisionOnClause() in src/lib/permissions.ts: Check if clause effectiveStatus is ESCALATED, verify user is either (a) the assigned approver (clause.escalatedToUserId === user.id) with APPROVE_ESCALATIONS permission, or (b) admin (bypass all checks)
-- [ ] T054 [US4] Add GET /api/users endpoint in src/app/api/users/route.ts: Return list of users with APPROVE_ESCALATIONS permission (query RolePermission table), filter by role
+- [X] T052 [US4] Add ESCALATE handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate reason, comment, assigneeId, create ClauseDecision, invalidate cache
+- [X] T053 [US4] Update canMakeDecisionOnClause() in src/lib/permissions.ts: Check if clause effectiveStatus is ESCALATED, verify user is either (a) the assigned approver (clause.escalatedToUserId === user.id) with APPROVE_ESCALATIONS permission, or (b) admin (bypass all checks)
+- [X] T054 [US4] Add GET /api/users endpoint in src/app/api/users/route.ts: Return list of users with APPROVE_ESCALATIONS permission (query RolePermission table), filter by role
 
 ### UI Components for US4
 
-- [ ] T055 [P] [US4] Create src/app/(app)/contracts/[id]/_components/escalate-modal.tsx: Render inline modal with reason dropdown (4 options), comment textarea, assignee dropdown, Confirm/Cancel buttons
-- [ ] T056 [P] [US4] Add handleEscalate() function in decision-buttons.tsx: Open escalate modal when "Escalate" button clicked
-- [ ] T057 [US4] Add handleConfirmEscalate() function in escalate-modal.tsx: Call POST /api/clauses/[id]/decisions with actionType=ESCALATE, close modal, update UI
-- [ ] T058 [US4] Update decision-buttons.tsx: Disable all action buttons (accept, replace, edit, escalate) when clause is ESCALATED and user is not assigned approver or admin
-- [ ] T059 [US4] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Show "Escalated to [assignee name]" label when status is ESCALATED
-- [ ] T060 [US4] Add locked state UI in clause-text.tsx: Show message "Awaiting decision from [assignee name]" when clause is locked for current user
+- [X] T055 [P] [US4] Create src/app/(app)/contracts/[id]/_components/escalate-modal.tsx: Render inline modal with reason dropdown (4 options), comment textarea, assignee dropdown, Confirm/Cancel buttons
+- [X] T056 [P] [US4] Add handleEscalate() function in decision-buttons.tsx: Open escalate modal when "Escalate" button clicked
+- [X] T057 [US4] Add handleConfirmEscalate() function in escalate-modal.tsx: Call POST /api/clauses/[id]/decisions with actionType=ESCALATE, close modal, update UI
+- [X] T058 [US4] Update decision-buttons.tsx: Disable all action buttons (accept, replace, edit, escalate) when clause is ESCALATED and user is not assigned approver or admin
+- [X] T059 [US4] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Show "Escalated to [assignee name]" label when status is ESCALATED
+- [X] T060 [US4] Add locked state UI in clause-text.tsx: Show message "Awaiting decision from [assignee name]" when clause is locked for current user
 
 **Checkpoint**: User Story 4 complete - reviewers can escalate clauses with full governance workflow and lock enforcement
 
