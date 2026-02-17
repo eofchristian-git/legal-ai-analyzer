@@ -3,7 +3,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
-import { ArrowUpDown, Filter } from "lucide-react";
+import { ArrowUpDown, Filter, CheckCircle2, AlertTriangle, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +18,11 @@ interface ClauseListProps {
   selectedClauseId: string | null;
   finalized: boolean;
   onSelectClause: (id: string) => void;
+  clauseProjections?: Record<string, {
+    resolvedCount: number;
+    totalFindingCount: number;
+    effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
+  }>;
 }
 
 function getMaxRisk(findings: { riskLevel: string }[]): string {
@@ -38,19 +43,42 @@ const riskOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
 
 type RiskFilter = "ALL" | "RED" | "YELLOW" | "GREEN";
 type SortMode = "position" | "risk" | "triage";
+type ResolutionFilter = "ALL" | "PENDING" | "IN_PROGRESS" | "RESOLVED" | "ESCALATED";
 
-export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClause }: ClauseListProps) {
+export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClause, clauseProjections = {} }: ClauseListProps) {
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("ALL");
   const [sortMode, setSortMode] = useState<SortMode>("position");
+  const [resolutionFilter, setResolutionFilter] = useState<ResolutionFilter>("ALL");
 
   const filteredAndSorted = useMemo(() => {
     let result = [...clauses];
 
-    // Filter
+    // Risk filter
     if (riskFilter !== "ALL") {
       result = result.filter((c) => {
         if (c.findings.length === 0) return false;
         return getMaxRisk(c.findings) === riskFilter;
+      });
+    }
+
+    // T013: Resolution status filter
+    if (resolutionFilter !== "ALL") {
+      result = result.filter((c) => {
+        const projection = clauseProjections[c.id];
+        if (!projection) return false;
+        
+        switch (resolutionFilter) {
+          case "PENDING":
+            return projection.effectiveStatus === 'PENDING';
+          case "IN_PROGRESS":
+            return projection.effectiveStatus === 'PARTIALLY_RESOLVED';
+          case "RESOLVED":
+            return projection.effectiveStatus === 'RESOLVED';
+          case "ESCALATED":
+            return projection.effectiveStatus === 'ESCALATED';
+          default:
+            return true;
+        }
       });
     }
 
@@ -70,7 +98,7 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
     }
 
     return result;
-  }, [clauses, riskFilter, sortMode]);
+  }, [clauses, riskFilter, sortMode, resolutionFilter, clauseProjections]);
 
   if (clauses.length === 0) {
     return (
@@ -87,7 +115,7 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
           Clauses ({clauses.length})
         </p>
         {/* Filter & Sort controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           {/* Risk filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -96,7 +124,7 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                 riskFilter !== "ALL" && "bg-primary/10 text-foreground"
               )}>
                 <Filter className="h-3 w-3" />
-                {riskFilter === "ALL" ? "All" : riskLabel[riskFilter]}
+                {riskFilter === "ALL" ? "Risk: All" : riskLabel[riskFilter]}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[100px]">
@@ -104,6 +132,26 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
               <DropdownMenuItem onClick={() => setRiskFilter("RED")} className="text-xs">High</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRiskFilter("YELLOW")} className="text-xs">Medium</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRiskFilter("GREEN")} className="text-xs">Low</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* T013: Resolution status filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className={cn(
+                "h-6 text-[10px] px-2 gap-1",
+                resolutionFilter !== "ALL" && "bg-primary/10 text-foreground"
+              )}>
+                <CheckCircle2 className="h-3 w-3" />
+                {resolutionFilter === "ALL" ? "Status: All" : resolutionFilter === "IN_PROGRESS" ? "In Progress" : resolutionFilter}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[120px]">
+              <DropdownMenuItem onClick={() => setResolutionFilter("ALL")} className="text-xs">All</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setResolutionFilter("PENDING")} className="text-xs">Pending</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setResolutionFilter("IN_PROGRESS")} className="text-xs">In Progress</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setResolutionFilter("RESOLVED")} className="text-xs">Resolved</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setResolutionFilter("ESCALATED")} className="text-xs">Escalated</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -141,6 +189,12 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                 .map((f) => f.triagedByName)
                 .filter(Boolean)
             )];
+            // T012: Get resolution progress
+            const projection = clauseProjections[clause.id];
+            const resolvedCount = projection?.resolvedCount ?? 0;
+            const totalFindingCount = projection?.totalFindingCount ?? findingCount;
+            const effectiveStatus = projection?.effectiveStatus;
+            
             return (
               <button
                 key={clause.id}
@@ -168,10 +222,26 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                     )}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {findingCount > 0 && (
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {findingCount}
+                    {/* T012: Resolution progress indicator */}
+                    {totalFindingCount > 0 && projection && (
+                      <span className={cn(
+                        "text-[10px] tabular-nums",
+                        effectiveStatus === 'RESOLVED' ? "text-green-600 font-medium" :
+                        effectiveStatus === 'ESCALATED' ? "text-amber-600" :
+                        "text-muted-foreground"
+                      )}>
+                        {resolvedCount}/{totalFindingCount}
                       </span>
+                    )}
+                    {/* T012: Status icons */}
+                    {effectiveStatus === 'RESOLVED' && (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                    )}
+                    {effectiveStatus === 'ESCALATED' && (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                    )}
+                    {effectiveStatus === 'NO_ISSUES' && (
+                      <CheckCheck className="h-3.5 w-3.5 text-green-600/70" />
                     )}
                     {findingCount > 0 && (
                       <span className={cn(
@@ -193,7 +263,25 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                     {clause.clauseName}
                   </p>
                 )}
-                {triagedFindings.length > 0 && (
+                {/* T012: Show "No issues" label for zero-finding clauses */}
+                {effectiveStatus === 'NO_ISSUES' && (
+                  <p className={cn(
+                    "text-[10px] mt-0.5",
+                    isSelected ? "text-green-600/80" : "text-green-600/60"
+                  )}>
+                    No issues
+                  </p>
+                )}
+                {/* T012: Show "Resolved" status badge for fully resolved clauses */}
+                {effectiveStatus === 'RESOLVED' && (
+                  <p className={cn(
+                    "text-[10px] mt-0.5 font-medium",
+                    isSelected ? "text-green-600" : "text-green-600/70"
+                  )}>
+                    Resolved
+                  </p>
+                )}
+                {triagedFindings.length > 0 && effectiveStatus !== 'RESOLVED' && effectiveStatus !== 'NO_ISSUES' && (
                   <p className={cn(
                     "text-[10px] mt-0.5 truncate",
                     isSelected ? "text-foreground/60" : "text-muted-foreground/50"

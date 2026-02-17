@@ -20,7 +20,8 @@ interface NoteInputProps {
   onOpenChange: (open: boolean) => void;
   clauseId: string;
   clauseName: string;
-  onNoteSaved: () => void;  // Callback after successful save
+  findingId?: string;  // Feature 007: Optional finding ID for per-finding notes
+  onNoteSaved: () => void;
 }
 
 export function NoteInput({
@@ -28,6 +29,7 @@ export function NoteInput({
   onOpenChange,
   clauseId,
   clauseName,
+  findingId,
   onNoteSaved,
 }: NoteInputProps) {
   const [noteText, setNoteText] = useState('');
@@ -47,6 +49,7 @@ export function NoteInput({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actionType: 'ADD_NOTE',
+          findingId: findingId || undefined,
           payload: {
             noteText: noteText.trim(),
           },

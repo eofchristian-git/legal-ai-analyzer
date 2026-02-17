@@ -22,7 +22,7 @@ export const DecisionActionType = {
 export type DecisionActionType = typeof DecisionActionType[keyof typeof DecisionActionType];
 
 // ============================================================================
-// Clause Status (computed by projection engine)
+// Clause Status (legacy — used by Feature 006 clause-level projection)
 // ============================================================================
 
 export const ClauseStatus = {
@@ -35,6 +35,46 @@ export const ClauseStatus = {
 } as const;
 
 export type ClauseStatus = typeof ClauseStatus[keyof typeof ClauseStatus];
+
+// ============================================================================
+// Finding Status (per-finding state — Feature 007)
+// ============================================================================
+
+export const FindingStatusValue = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  ESCALATED: 'ESCALATED',
+  RESOLVED_APPLIED_FALLBACK: 'RESOLVED_APPLIED_FALLBACK',
+  RESOLVED_MANUAL_EDIT: 'RESOLVED_MANUAL_EDIT',
+} as const;
+
+export type FindingStatusValue = typeof FindingStatusValue[keyof typeof FindingStatusValue];
+
+export interface FindingStatusEntry {
+  status: FindingStatusValue;
+  escalatedTo: string | null;
+  escalatedToName: string | null;
+  escalationReason: string | null;
+  escalationComment: string | null;
+  noteCount: number;
+  notes: Array<{ text: string; timestamp: Date; userName: string }>;
+  lastActionType: DecisionActionType | null;
+  lastActionTimestamp: Date | null;
+}
+
+// ============================================================================
+// Derived Clause Status (computed from finding statuses — Feature 007)
+// ============================================================================
+
+export const DerivedClauseStatus = {
+  PENDING: 'PENDING',
+  PARTIALLY_RESOLVED: 'PARTIALLY_RESOLVED',
+  RESOLVED: 'RESOLVED',
+  ESCALATED: 'ESCALATED',
+  NO_ISSUES: 'NO_ISSUES',
+} as const;
+
+export type DerivedClauseStatus = typeof DerivedClauseStatus[keyof typeof DerivedClauseStatus];
 
 // ============================================================================
 // Permission Types (RBAC)
@@ -105,17 +145,24 @@ export type ClauseDecisionPayload =
 export interface ClauseDecision {
   id: string;
   clauseId: string;
+  findingId: string | null;  // null for legacy clause-level records (Feature 006)
   userId: string;
   actionType: DecisionActionType;
   timestamp: Date;
   payload: ClauseDecisionPayload;
-  
+
   // Optional relations
   user?: {
     id: string;
     name: string;
     email: string;
   };
+  finding?: {
+    id: string;
+    riskLevel: string;
+    matchedRuleTitle: string;
+  } | null;
+  isLegacy?: boolean;  // true when findingId is null
 }
 
 // ============================================================================
@@ -126,7 +173,7 @@ export interface ProjectionResult {
   clauseId: string;
   originalText: string | null;
   effectiveText: string | null;
-  effectiveStatus: ClauseStatus;
+  effectiveStatus: DerivedClauseStatus;
   trackedChanges: TrackedChange[];
   decisionCount: number;
   lastDecisionTimestamp: Date | null;
@@ -134,6 +181,11 @@ export interface ProjectionResult {
   escalatedToUserName: string | null;
   escalationReason: string | null;
   hasUnresolvedEscalation: boolean;
+
+  // Feature 007: Per-finding resolution tracking
+  findingStatuses: Record<string, FindingStatusEntry>;
+  resolvedCount: number;
+  totalFindingCount: number;
 }
 
 // ============================================================================
@@ -153,6 +205,7 @@ export interface ApplyDecisionRequest {
   actionType: DecisionActionType;
   payload: ClauseDecisionPayload;
   clauseUpdatedAtWhenLoaded?: string; // ISO timestamp for conflict detection
+  findingId: string;  // Required for all new decisions (Feature 007)
 }
 
 export interface ApplyDecisionResponse {

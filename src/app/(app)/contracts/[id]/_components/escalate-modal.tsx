@@ -38,7 +38,8 @@ interface EscalateModalProps {
   onOpenChange: (open: boolean) => void;
   clauseId: string;
   clauseName: string;
-  onEscalated: () => void;  // Callback after successful escalation
+  findingId?: string;  // Feature 007: Optional finding ID for per-finding escalation
+  onEscalated: () => void;
 }
 
 export function EscalateModal({
@@ -46,6 +47,7 @@ export function EscalateModal({
   onOpenChange,
   clauseId,
   clauseName,
+  findingId,
   onEscalated,
 }: EscalateModalProps) {
   const [reason, setReason] = useState<EscalationReason | ''>('');
@@ -102,6 +104,7 @@ export function EscalateModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actionType: 'ESCALATE',
+          findingId: findingId || undefined,
           payload: {
             reason,
             comment: comment.trim(),

@@ -1,18 +1,18 @@
 # Feature Specification: Per-Finding Decision Actions
 
-**Feature Branch**: `011-per-finding-actions`  
-**Created**: 2026-02-17  
-**Status**: Draft  
-**Depends On**: Feature 006 (Clause Decision Actions & Undo System)  
+**Feature Branch**: `007-per-finding-actions`
+**Created**: 2026-02-17
+**Status**: Draft
+**Depends On**: Feature 006 (Clause Decision Actions & Undo System)
 **Priority**: P2 (Post-MVP Enhancement)
 
 ---
 
 ## Executive Summary
 
-This feature extends the clause decision system (Feature 006) to support **finding-level actions**, enabling reviewers to make granular decisions on individual findings within a clause rather than operating at the clause level only. This provides more surgical control, better audit trails, and more intuitive UX when a clause contains multiple findings with different risk levels and recommended actions.
+This feature **replaces** the clause-level decision system (Feature 006) with **finding-level actions**. Instead of making decisions on an entire clause, reviewers make decisions on individual findings. Clause status is **derived automatically** — when all findings in a clause are resolved, the clause itself is marked as resolved. The left panel (clause list) reflects this resolution progress.
 
-**Key Capability**: Reviewers can accept Finding A's deviation while applying Finding B's fallback, escalate Finding C, and add a note to Finding D—all within the same clause, with independent undo/revert for each finding.
+**Key Capability**: Reviewers resolve findings one by one. The clause list shows progress (e.g., "2/3 resolved"). When the last finding is resolved, the clause turns green — fully resolved.
 
 ---
 
@@ -36,13 +36,11 @@ In the current implementation:
 3. **Finding C (GREEN)**: "Minor: Use 'shall' instead of 'will'" → No fallback
 
 **Desired Reviewer Actions**:
-- Apply Finding A's fallback (critical risk)
-- Accept Finding B's deviation (business approved short notice)
-- Add note to Finding C (address in next contract revision)
+- Apply Finding A's fallback (critical risk) → Finding A resolved
+- Accept Finding B's deviation (business approved short notice) → Finding B resolved
+- Add note to Finding C (address in next contract revision) → Finding C still pending
 
-**Current System**: Forces a single clause-level decision, requiring workarounds.
-
-**Proposed System**: Each finding has its own action buttons and decision history.
+**Clause status**: 2/3 findings resolved (shown in left panel). Once Finding C is also resolved, clause turns fully resolved.
 
 ---
 
@@ -50,8 +48,8 @@ In the current implementation:
 
 ### User Story 1: Per-Finding Accept Deviation (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** accept individual findings' deviations without affecting other findings  
+**As a** contract reviewer
+**I want to** accept individual findings' deviations
 **So that** I can approve low-risk issues while still addressing high-risk ones in the same clause
 
 **Acceptance Criteria**:
@@ -61,20 +59,20 @@ In the current implementation:
 
 ### User Story 2: Per-Finding Fallback Replacement (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** select which finding's fallback to apply when multiple findings offer fallback language  
-**So that** I can address the specific deviation I want to remediate without auto-selection
+**As a** contract reviewer
+**I want to** select which finding's fallback to apply
+**So that** I can address the specific deviation I want to remediate
 
 **Acceptance Criteria**:
-1. **Given** a clause with 2 findings that both have fallback language, **When** I view the Decision Actions section, **Then** I see an explicit dropdown or option to choose which fallback to apply
+1. **Given** a clause with 2 findings that both have fallback language, **When** I view the finding cards, **Then** each finding has its own "Apply Fallback" button
 2. **Given** I apply Finding B's fallback, **When** the clause text is replaced, **Then** the decision history shows it was Finding B's fallback, not Finding A's
 3. **Given** I apply Finding A's fallback and later apply Finding B's fallback, **When** projection runs, **Then** Finding B's text is used (last-write-wins) and history shows both decisions with timestamps
 
 ### User Story 3: Per-Finding Escalation (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** escalate individual high-risk findings to senior reviewers  
-**So that** I can get guidance on specific issues without escalating the entire clause
+**As a** contract reviewer
+**I want to** escalate individual high-risk findings to senior reviewers
+**So that** I can get guidance on specific issues without blocking other findings
 
 **Acceptance Criteria**:
 1. **Given** a clause with RED and GREEN findings, **When** I escalate only the RED finding, **Then** the GREEN finding remains actionable while the RED finding shows "Escalated to [Approver]"
@@ -83,8 +81,8 @@ In the current implementation:
 
 ### User Story 4: Per-Finding Undo (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** undo my decision on a specific finding without affecting my decisions on other findings  
+**As a** contract reviewer
+**I want to** undo my decision on a specific finding without affecting my decisions on other findings
 **So that** I can correct mistakes surgically without losing work on other findings
 
 **Acceptance Criteria**:
@@ -94,25 +92,59 @@ In the current implementation:
 
 ### User Story 5: Per-Finding Revert to Original (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** revert all decisions on a specific finding back to its original state  
+**As a** contract reviewer
+**I want to** revert all decisions on a specific finding back to its original state
 **So that** I can start fresh on that finding without affecting other findings in the clause
 
 **Acceptance Criteria**:
-1. **Given** Finding A has 5 decisions (multiple accept/undo cycles), **When** I click "Revert to Original" on Finding A, **Then** all of Finding A's decisions are marked inactive and the finding returns to "No decision" state
+1. **Given** Finding A has 5 decisions (multiple accept/undo cycles), **When** I click "Revert to Original" on Finding A, **Then** all of Finding A's decisions are marked inactive and the finding returns to "Pending" state
 2. **Given** I revert Finding A while Finding B has an active fallback applied, **When** viewing the clause, **Then** Finding B's text modification remains but Finding A's contributions are removed
 3. **Given** I revert a finding, **When** viewing decision history, **Then** the revert action is logged with a timestamp and my user ID, and prior decisions show "Reverted" badges
 
 ### User Story 6: Per-Finding Internal Notes (Priority: P2)
 
-**As a** contract reviewer  
-**I want to** add internal notes to specific findings  
+**As a** contract reviewer
+**I want to** add internal notes to specific findings
 **So that** I can document context, rationale, or follow-up items for each issue independently
 
 **Acceptance Criteria**:
 1. **Given** a clause with 3 findings, **When** I add a note "Discuss with business team" to Finding B, **Then** the note appears only on Finding B's card and not on the other findings
 2. **Given** multiple notes on a single finding, **When** viewing the finding card, **Then** I see all notes in chronological order with author names and timestamps
 3. **Given** a finding has a note, **When** I export the contract report, **Then** the note is included in the audit trail tied to that specific finding
+
+### User Story 7: Clause Resolution Progress (Priority: P2)
+
+**As a** contract reviewer
+**I want to** see at a glance which clauses are fully resolved, partially resolved, or unresolved
+**So that** I can prioritize my review work and know when I'm done
+
+**Acceptance Criteria**:
+1. **Given** a clause with 3 findings where 2 are resolved, **When** I view the clause list (left panel), **Then** I see "2/3" resolved progress indicator on that clause
+2. **Given** all findings in a clause are resolved (accepted, fallback applied, or manually edited), **When** I view the clause list, **Then** the clause shows a "Resolved" badge with green styling
+3. **Given** a clause has an escalated finding, **When** I view the clause list, **Then** the clause shows an escalation indicator alongside the resolution progress
+4. **Given** a clause with 0 findings (no deviations detected), **When** I view the clause list, **Then** it shows as "No issues" (auto-resolved)
+
+### User Story 8: Accept All Findings Shortcut (Priority: P2)
+
+**As a** contract reviewer
+**I want to** quickly accept all findings in a clause at once
+**So that** I can fast-track low-risk clauses without clicking each finding individually
+
+**Acceptance Criteria**:
+1. **Given** a clause with 3 unresolved findings, **When** I click "Accept All", **Then** the system creates individual finding-level ACCEPT decisions for each finding
+2. **Given** I used "Accept All" and later want to change one finding, **When** I undo that specific finding, **Then** only that finding reverts while the others remain accepted
+3. **Given** a clause with one escalated finding and two unresolved, **When** I click "Accept All", **Then** only the non-escalated findings are accepted (escalated finding is skipped)
+
+---
+
+## Clarifications
+
+### Session 2026-02-17
+
+- Q: When a finding is escalated, should other findings in the clause remain actionable? → A: Only the escalated finding is locked; other findings remain fully actionable.
+- Q: Feature flag or direct deployment? → A: No feature flag; rely on phased deployment (schema → API → UI). No FF infrastructure needed.
+- Q: Should "Accept All Findings" be included as a bulk shortcut? → A: Yes, creates individual finding-level ACCEPT decisions per finding (granular audit trail preserved). Skips escalated findings.
+- Q: Clause-level vs finding-level decisions? → A: Finding-level only. No clause-level decisions. Clause status is derived from finding statuses.
 
 ---
 
@@ -122,50 +154,64 @@ In the current implementation:
 
 #### Core Per-Finding Actions
 
-- **FR-001**: System MUST allow users to apply decision actions (accept, escalate, note) at the finding level, independent of other findings in the same clause
-- **FR-002**: System MUST store a `findingId` (optional, nullable) in the `ClauseDecision` model to associate decisions with specific findings
-- **FR-003**: System MUST support both finding-level decisions (when `findingId` is present) and clause-level decisions (when `findingId` is null) for backward compatibility
-- **FR-004**: System MUST display action buttons directly on each finding card in the Findings Panel
-- **FR-005**: System MUST show visual status indicators on finding cards (Accepted badge, Escalated tag, note count) reflecting active finding-level decisions
+- **FR-001**: All decision actions (accept, escalate, note, fallback, edit, undo, revert) MUST operate at the finding level. There are no clause-level decisions.
+- **FR-002**: System MUST store a required `findingId` in the `ClauseDecision` model for all new decisions
+- **FR-003**: System MUST display action buttons directly on each finding card in the Findings Panel
+- **FR-004**: System MUST show visual status indicators on finding cards (Accepted badge, Escalated tag, note count) reflecting the finding's current decision state
+- **FR-005**: System MUST provide an "Accept All Findings" bulk action that creates individual finding-level ACCEPT decisions for each unresolved, non-escalated finding in the clause
+- **FR-006**: When a finding is escalated, ONLY that finding MUST be locked for non-approver users; other findings in the same clause MUST remain fully actionable
 
 #### Text Modification Actions
 
-- **FR-006**: System MUST allow users to apply a specific finding's fallback by selecting that finding (via button on finding card or dropdown in Decision Actions section)
-- **FR-007**: System MUST handle multiple text-replacement decisions on the same clause using a **last-write-wins** strategy: the most recent text-modifying decision determines the effective clause text
-- **FR-008**: System MUST NOT attempt to merge multiple fallback texts from different findings into a single clause (NLP complexity avoided)
-- **FR-009**: System MUST store the source `findingId` with each text-replacement decision to track which finding prompted the change
+- **FR-007**: System MUST allow users to apply a specific finding's fallback via a button on that finding's card
+- **FR-008**: System MUST handle multiple text-replacement decisions on the same clause using a **last-write-wins** strategy: the most recent text-modifying decision determines the effective clause text
+- **FR-009**: System MUST NOT attempt to merge multiple fallback texts from different findings into a single clause (NLP complexity avoided)
+- **FR-010**: System MUST store the source `findingId` with each text-replacement decision to track which finding prompted the change
 
 #### Undo & Revert
 
-- **FR-010**: System MUST provide a per-finding "Undo" action that reverses only the most recent decision on that specific finding
-- **FR-011**: System MUST provide a per-finding "Revert to Original" action that marks all decisions on that finding as inactive (similar to clause-level REVERT but scoped to one finding)
-- **FR-012**: System MUST maintain clause-level "Undo All" and "Revert All" actions for global resets
-- **FR-013**: System MUST preserve full decision history for both finding-level and clause-level actions in chronological order
+- **FR-011**: System MUST provide a per-finding "Undo" action that reverses only the most recent active decision on that specific finding
+- **FR-012**: System MUST provide a per-finding "Revert to Original" action that marks all decisions on that finding as inactive, returning it to PENDING state
+- **FR-013**: System MUST provide a clause-level "Reset All" action that reverts all findings in the clause to PENDING state (creates a REVERT decision for each finding)
+- **FR-014**: System MUST preserve full decision history for all finding-level actions in chronological order
 
-#### Projection & Status
+#### Derived Clause Status
 
-- **FR-014**: System MUST compute effective finding status (ACCEPTED, ESCALATED, etc.) by replaying finding-level decisions during projection
-- **FR-015**: System MUST compute effective clause text by replaying text-modifying decisions in chronological order (last-write-wins)
-- **FR-016**: System MUST support querying projection results filtered by finding (e.g., "Is Finding A accepted?")
-- **FR-017**: System MUST invalidate projection cache when any decision (finding-level or clause-level) is applied to the clause
+- **FR-015**: Clause status MUST be computed by aggregating finding statuses. A clause is:
+  - **RESOLVED** when all findings have a resolved status (ACCEPTED, RESOLVED_APPLIED_FALLBACK, RESOLVED_MANUAL_EDIT)
+  - **PARTIALLY_RESOLVED** when some but not all findings are resolved
+  - **ESCALATED** when any finding is in ESCALATED state (takes visual priority)
+  - **PENDING** when no findings have been resolved
+  - **NO_ISSUES** when the clause has zero findings (no deviations detected)
+- **FR-016**: System MUST compute effective clause text by replaying text-modifying decisions in chronological order (last-write-wins)
+- **FR-017**: System MUST support querying projection results filtered by finding (e.g., "Is Finding A accepted?")
+- **FR-018**: System MUST invalidate projection cache when any finding-level decision is applied
+
+#### Clause List (Left Panel)
+
+- **FR-019**: Each clause in the left panel MUST display a resolution progress indicator showing `{resolved}/{total}` findings count
+- **FR-020**: Fully resolved clauses (all findings resolved) MUST show a green "Resolved" badge or checkmark
+- **FR-021**: Clauses with escalated findings MUST show an escalation indicator (e.g., warning icon) alongside the progress
+- **FR-022**: Clauses with zero findings MUST display as "No issues" with a distinct neutral/green style
+- **FR-023**: The clause list MUST support filtering by resolution status (All, Pending, Partially Resolved, Resolved, Escalated)
 
 #### UI/UX
 
-- **FR-018**: System MUST render mini action buttons on each finding card with icons and labels (Accept, Escalate, Note, Apply Fallback if available)
-- **FR-019**: System MUST show a dropdown or selection UI for "Replace with Fallback" when multiple findings in a clause have fallback language
-- **FR-020**: System MUST display a per-finding decision history expandable section showing only that finding's decisions
-- **FR-021**: System MUST update finding card badges immediately (no page reload) when a finding-level decision is applied
-- **FR-022**: System MUST visually distinguish between finding-level and clause-level decisions in the Decision History Log
+- **FR-024**: System MUST render action buttons on each finding card with icons and labels (Accept, Escalate, Note, Apply Fallback if available)
+- **FR-025**: System MUST display a per-finding decision history expandable section showing only that finding's decisions
+- **FR-026**: System MUST update finding card badges immediately (no page reload) when a finding-level decision is applied
+- **FR-027**: The existing clause-level decision buttons (decision-buttons.tsx) MUST be replaced with per-finding actions on each finding card, plus "Accept All" and "Reset All" as clause-wide shortcuts
+- **FR-028**: Decision History Log MUST show which finding each decision applies to, with a filter dropdown to view one finding's history
 
-#### Backward Compatibility
+#### Legacy Decision Migration
 
-- **FR-023**: System MUST continue to support existing clause-level decisions (created before Feature 011) where `findingId` is null
-- **FR-024**: System MUST treat null `findingId` as a clause-level decision affecting all findings or the clause as a whole
-- **FR-025**: System MUST allow users to make new clause-level decisions even after Feature 011 is deployed (both modes coexist)
+- **FR-029**: Existing clause-level decisions (from Feature 006, where `findingId` is null) MUST be preserved in the database as historical records
+- **FR-030**: Legacy clause-level decisions MUST be displayed in the decision history with a "Legacy (clause-level)" label
+- **FR-031**: Legacy decisions MUST NOT affect the new finding-level projection computation (they are display-only historical records)
 
 ### Non-Functional Requirements
 
-- **NFR-001**: Per-finding action buttons MUST respond within 500ms (same as clause-level actions)
+- **NFR-001**: Per-finding action buttons MUST respond within 500ms
 - **NFR-002**: Projection computation MUST handle finding-level decisions without performance degradation for clauses with up to 10 findings
 - **NFR-003**: UI MUST remain usable on mobile devices with finding-level action buttons appropriately sized for touch
 - **NFR-004**: System MUST maintain audit trail integrity: finding-level decisions MUST NOT be editable or deletable after creation
@@ -182,111 +228,83 @@ In the current implementation:
 model ClauseDecision {
   id         String         @id @default(cuid())
   clauseId   String
-  findingId  String?        // NEW: Optional - ties decision to specific finding
+  findingId  String?        // Required for new decisions; null only for legacy clause-level records
   userId     String
   actionType String         // ACCEPT_DEVIATION | APPLY_FALLBACK | EDIT_MANUAL | ESCALATE | ADD_NOTE | UNDO | REVERT
   timestamp  DateTime       @default(now())
   payload    String         // JSON
-  
+
   clause     AnalysisClause  @relation(fields: [clauseId], references: [id], onDelete: Cascade)
-  finding    AnalysisFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull) // NEW
+  finding    AnalysisFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
   user       User            @relation("ClauseDecisions", fields: [userId], references: [id])
-  
+
   @@index([clauseId, timestamp])
-  @@index([clauseId, findingId, timestamp]) // NEW: For finding-level projection
+  @@index([clauseId, findingId, timestamp])
   @@index([clauseId])
 }
 ```
 
+Note: `findingId` is nullable at the schema level to preserve legacy records, but the API MUST reject new decisions without a `findingId`.
+
 #### 2. Migration Strategy
 
-- Add `findingId` as nullable field (existing records default to null)
-- Add foreign key constraint to `AnalysisFinding` with `onDelete: SetNull` (if finding is deleted, decision remains as clause-level)
+- Add `findingId` as nullable field (existing records keep null — they become legacy display-only records)
+- Add foreign key constraint to `AnalysisFinding` with `onDelete: SetNull`
 - Add composite index `[clauseId, findingId, timestamp]` for efficient finding-level queries
+- No data migration needed — legacy records are simply ignored by the new projection engine
 
-### Projection Algorithm Enhancement
+### Projection Algorithm
 
-#### Current (Clause-Level Only)
 ```typescript
 function computeProjection(clauseId: string): ProjectionResult {
-  const decisions = await db.clauseDecision.findMany({
+  const allDecisions = await db.clauseDecision.findMany({
     where: { clauseId },
     orderBy: { timestamp: 'asc' }
   });
-  
-  // Replay all decisions chronologically
-  // Return effective text, status, tracked changes
-}
-```
 
-#### Enhanced (Finding-Level Aware)
-```typescript
-function computeProjection(clauseId: string): ProjectionResult {
-  const decisions = await db.clauseDecision.findMany({
-    where: { clauseId },
-    orderBy: { timestamp: 'asc' }
-  });
-  
-  // Separate finding-level and clause-level decisions
-  const clauseDecisions = decisions.filter(d => !d.findingId);
-  const findingDecisions = decisions.filter(d => d.findingId);
-  
-  // Compute per-finding status
-  const findingStatuses = computeFindingStatuses(findingDecisions);
-  
+  // Only process finding-level decisions (skip legacy null-findingId records)
+  const decisions = allDecisions.filter(d => d.findingId !== null);
+
+  // Compute per-finding statuses
+  const findingStatuses = computeFindingStatuses(decisions);
+
   // Compute effective text (last-write-wins for text modifications)
-  const textDecisions = decisions.filter(d => 
-    d.actionType === 'APPLY_FALLBACK' || d.actionType === 'EDIT_MANUAL'
-  );
-  const effectiveText = textDecisions[textDecisions.length - 1]?.payload.replacementText || originalText;
-  
-  // Compute clause-level status (aggregates finding statuses)
-  const effectiveStatus = computeClauseStatus(clauseDecisions, findingStatuses);
-  
+  const activeTextDecisions = getActiveTextDecisions(decisions);
+  const effectiveText = activeTextDecisions.length > 0
+    ? activeTextDecisions[activeTextDecisions.length - 1].payload.replacementText
+    : originalText;
+
+  // Derive clause status from finding statuses
+  const clauseStatus = deriveClauseStatus(findingStatuses, totalFindingCount);
+
   return {
     clauseId,
     effectiveText,
-    effectiveStatus,
-    findingStatuses,  // NEW: Map<findingId, FindingStatus>
+    effectiveStatus: clauseStatus,
+    findingStatuses,
     trackedChanges,
-    lastDecisionTimestamp,
-    decisionCount: decisions.length,
+    resolvedCount,
+    totalFindingCount,
+    // ...
   };
 }
 
-function computeFindingStatuses(findingDecisions: ClauseDecision[]): Map<string, FindingStatus> {
-  const grouped = groupBy(findingDecisions, d => d.findingId);
-  
-  return new Map(
-    Object.entries(grouped).map(([findingId, decisions]) => {
-      // Replay decisions for this finding
-      let status: FindingStatus = 'PENDING';
-      let escalatedTo: string | null = null;
-      
-      for (const decision of decisions) {
-        if (decision.actionType === 'REVERT') {
-          status = 'PENDING';
-          continue;
-        }
-        if (decision.actionType === 'UNDO') {
-          // Undo previous status
-          status = 'PENDING';
-          continue;
-        }
-        if (decision.actionType === 'ACCEPT_DEVIATION') {
-          status = 'ACCEPTED';
-          escalatedTo = null;
-        } else if (decision.actionType === 'ESCALATE') {
-          status = 'ESCALATED';
-          escalatedTo = decision.payload.assigneeId;
-        } else if (decision.actionType === 'APPLY_FALLBACK') {
-          status = 'RESOLVED_APPLIED_FALLBACK';
-        }
-      }
-      
-      return [findingId, { status, escalatedTo }];
-    })
-  );
+function deriveClauseStatus(
+  findingStatuses: Record<string, FindingStatusEntry>,
+  totalFindingCount: number
+): DerivedClauseStatus {
+  if (totalFindingCount === 0) return 'NO_ISSUES';
+
+  const statuses = Object.values(findingStatuses);
+  const resolvedStatuses = ['ACCEPTED', 'RESOLVED_APPLIED_FALLBACK', 'RESOLVED_MANUAL_EDIT'];
+
+  const resolvedCount = statuses.filter(s => resolvedStatuses.includes(s.status)).length;
+  const hasEscalated = statuses.some(s => s.status === 'ESCALATED');
+
+  if (hasEscalated) return 'ESCALATED';
+  if (resolvedCount === totalFindingCount) return 'RESOLVED';
+  if (resolvedCount > 0) return 'PARTIALLY_RESOLVED';
+  return 'PENDING';
 }
 ```
 
@@ -294,73 +312,39 @@ function computeFindingStatuses(findingDecisions: ClauseDecision[]): Map<string,
 
 #### POST /api/clauses/[id]/decisions
 
-**Request Body (Enhanced)**:
+Request body now **requires** `findingId`:
+
 ```typescript
 interface ApplyDecisionRequest {
   actionType: DecisionActionType;
   payload: ClauseDecisionPayload;
   clauseUpdatedAtWhenLoaded: string;
-  findingId?: string;  // NEW: Optional - if provided, action applies to this finding only
+  findingId: string;  // REQUIRED — must reference a valid finding in this clause
 }
 ```
 
-**Example: Accept Finding A**:
-```json
-{
-  "actionType": "ACCEPT_DEVIATION",
-  "findingId": "finding-abc-123",
-  "payload": {
-    "comment": "Business team approved this specific deviation"
-  },
-  "clauseUpdatedAtWhenLoaded": "2026-02-17T10:00:00Z"
-}
-```
-
-**Example: Apply Finding B's Fallback**:
-```json
-{
-  "actionType": "APPLY_FALLBACK",
-  "findingId": "finding-xyz-456",
-  "payload": {
-    "replacementText": "Liability capped at $1,000,000",
-    "source": "fallback",
-    "playbookRuleId": "rule-789"
-  },
-  "clauseUpdatedAtWhenLoaded": "2026-02-17T10:05:00Z"
-}
-```
-
-**Example: Undo Finding A's Last Decision**:
-```json
-{
-  "actionType": "UNDO",
-  "findingId": "finding-abc-123",
-  "payload": {
-    "undoneDecisionId": "decision-999"
-  },
-  "clauseUpdatedAtWhenLoaded": "2026-02-17T10:10:00Z"
-}
-```
+**Validation**: Returns 400 if `findingId` is missing or doesn't belong to the clause.
 
 #### GET /api/clauses/[id]/projection
 
-**Response (Enhanced)**:
+Response includes `findingStatuses` and derived clause resolution info:
+
 ```typescript
 interface ProjectionResult {
   clauseId: string;
   effectiveText: string;
-  effectiveStatus: ClauseStatus;
+  effectiveStatus: DerivedClauseStatus; // PENDING | PARTIALLY_RESOLVED | RESOLVED | ESCALATED | NO_ISSUES
   trackedChanges: TrackedChange[];
   lastDecisionTimestamp: Date | null;
   decisionCount: number;
-  escalatedTo: string | null;
-  hasConflict: boolean;
-  
-  // NEW: Per-finding status map
+  resolvedCount: number;        // NEW: number of resolved findings
+  totalFindingCount: number;    // NEW: total findings in clause
+
   findingStatuses: {
     [findingId: string]: {
       status: FindingStatus;
       escalatedTo: string | null;
+      escalatedToName: string | null;
       noteCount: number;
       lastActionType: DecisionActionType | null;
       lastActionTimestamp: Date | null;
@@ -369,185 +353,50 @@ interface ProjectionResult {
 }
 ```
 
-### UI Components
+### UI Changes
 
-#### 1. Enhanced FindingCard Component
+#### 1. Left Panel — Clause List Enhancement
 
-Add mini action buttons to each finding card:
+Each clause item gains a resolution progress indicator:
 
-```typescript
-// In FindingCard component (findings-panel.tsx)
-
-function FindingCard({ finding, contractId, clauseId, onDecisionApplied }) {
-  const findingStatus = projection?.findingStatuses?.[finding.id];
-  
-  return (
-    <div className="rounded-lg border p-3">
-      {/* Existing finding content: risk badge, summary, excerpt, fallback */}
-      
-      {/* NEW: Per-finding actions */}
-      {!finalized && (
-        <div className="flex flex-wrap gap-1.5 pt-2 mt-2 border-t">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleAcceptFinding(finding.id)}
-            disabled={findingStatus?.status === 'ACCEPTED'}
-            className="h-7 px-2 text-xs"
-          >
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Accept
-          </Button>
-          
-          {finding.fallbackText && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleApplyFindingFallback(finding.id)}
-              className="h-7 px-2 text-xs"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Apply fallback
-            </Button>
-          )}
-          
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleEscalateFinding(finding.id)}
-            disabled={findingStatus?.status === 'ESCALATED'}
-            className="h-7 px-2 text-xs"
-          >
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Escalate
-          </Button>
-          
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleAddNoteFinding(finding.id)}
-            className="h-7 px-2 text-xs"
-          >
-            <MessageSquare className="h-3 w-3 mr-1" />
-            Note {findingStatus?.noteCount > 0 && `(${findingStatus.noteCount})`}
-          </Button>
-          
-          {/* Undo & Revert (only show if finding has decisions) */}
-          {findingStatus?.lastActionType && (
-            <>
-              <div className="w-full" /> {/* Line break */}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleUndoFinding(finding.id)}
-                className="h-7 px-2 text-xs"
-              >
-                <Undo2 className="h-3 w-3 mr-1" />
-                Undo
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleRevertFinding(finding.id)}
-                className="h-7 px-2 text-xs"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Revert
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-      
-      {/* NEW: Finding status badge */}
-      {findingStatus && (
-        <div className="flex items-center gap-2 mt-2">
-          {findingStatus.status === 'ACCEPTED' && (
-            <Badge variant="outline" className="bg-green-50 text-green-700">
-              ✓ Accepted
-            </Badge>
-          )}
-          {findingStatus.status === 'ESCALATED' && (
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
-              ⚠ Escalated to {findingStatus.escalatedTo}
-            </Badge>
-          )}
-          {findingStatus.status === 'RESOLVED_APPLIED_FALLBACK' && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              🔁 Fallback Applied
-            </Badge>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+```
+┌─────────────────────────────────┐
+│ § 3.1                    2/3 ✓  │  ← Partially resolved
+│ Limitation of Liability   ◼ Red │
+│ 2/3 by Jane D.                  │
+├─────────────────────────────────┤
+│ § 4.2                    3/3 ✓  │  ← Fully resolved (green)
+│ Indemnification          ◼ Med  │
+├─────────────────────────────────┤
+│ § 5.1                    0/2 ⚠  │  ← Has escalation
+│ Warranty                 ◼ Red  │
+├─────────────────────────────────┤
+│ § 6.1              No issues    │  ← Zero findings
+│ Governing Law                   │
+└─────────────────────────────────┘
 ```
 
-#### 2. Enhanced Decision History Log
+New filter options: All | Pending | In Progress | Resolved | Escalated
 
-Show finding-specific decisions with visual grouping:
+#### 2. Finding Cards — Replace Clause-Level Buttons
 
-```typescript
-// In DecisionHistoryLog component
+Remove the existing `decision-buttons.tsx` clause-level action panel. Each finding card gets its own action buttons:
 
-function DecisionHistoryLog({ clauseId, findings }) {
-  const [filterFindingId, setFilterFindingId] = useState<string | null>(null);
-  
-  const filteredDecisions = decisions.filter(d => 
-    !filterFindingId || d.findingId === filterFindingId || !d.findingId
-  );
-  
-  return (
-    <div>
-      {/* Filter dropdown */}
-      <Select value={filterFindingId || 'all'} onValueChange={setFilterFindingId}>
-        <SelectTrigger>
-          <SelectValue placeholder="All decisions" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All decisions</SelectItem>
-          <SelectSeparator />
-          {findings.map(f => (
-            <SelectItem key={f.id} value={f.id}>
-              {f.matchedRuleTitle} ({f.riskLevel})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      {/* Decision timeline */}
-      {filteredDecisions.map(decision => (
-        <DecisionHistoryItem 
-          key={decision.id}
-          decision={decision}
-          finding={decision.findingId ? findings.find(f => f.id === decision.findingId) : null}
-        />
-      ))}
-    </div>
-  );
-}
+- Accept | Apply Fallback (if available) | Escalate | Note
+- Undo | Revert (shown only when finding has active decisions)
+- Status badge: Accepted (green) | Escalated (yellow) | Fallback Applied (blue) | Pending (no badge)
 
-function DecisionHistoryItem({ decision, finding }) {
-  return (
-    <div className="flex items-start gap-3">
-      {/* Existing decision display */}
-      
-      {/* NEW: Show which finding this applies to */}
-      {finding && (
-        <Badge variant="outline" className="ml-2">
-          {finding.matchedRuleTitle}
-        </Badge>
-      )}
-      {!finding && (
-        <Badge variant="outline" className="ml-2 opacity-50">
-          Entire clause
-        </Badge>
-      )}
-    </div>
-  );
-}
-```
+#### 3. Clause-Wide Shortcuts
+
+Above the findings list, two shortcut buttons replace the old clause-level buttons:
+- **"Accept All"** — Accepts all unresolved, non-escalated findings at once
+- **"Reset All"** — Reverts all findings to PENDING (creates REVERT for each)
+
+#### 4. Decision History Log
+
+- Each decision shows which finding it applies to (badge with finding title)
+- Filter dropdown to view one finding's history
+- Legacy clause-level decisions shown with "Legacy" label (display-only, no undo)
 
 ---
 
@@ -557,57 +406,56 @@ function DecisionHistoryItem({ decision, finding }) {
 1. Add `findingId` column as nullable to `ClauseDecision` table
 2. Add foreign key constraint with `ON DELETE SET NULL`
 3. Add composite index `[clauseId, findingId, timestamp]`
-4. **No data migration needed** - existing records remain clause-level (findingId = null)
+4. **No data migration** — existing records keep `findingId = null` (legacy)
 
-### Phase 2: API Enhancement (Backward Compatible)
-1. Update POST `/api/clauses/[id]/decisions` to accept optional `findingId` in request body
-2. Update projection algorithm to handle both null and non-null `findingId`
-3. Update GET `/api/clauses/[id]/projection` response to include `findingStatuses` map
-4. **Existing API calls work unchanged** - no breaking changes
+### Phase 2: API + Projection (Breaking Change for Decisions)
+1. Update POST `/api/clauses/[id]/decisions` to **require** `findingId`
+2. Update projection to only process finding-level decisions; skip legacy records
+3. Add `resolvedCount`, `totalFindingCount`, and `findingStatuses` to projection response
+4. Add `deriveClauseStatus()` logic
 
-### Phase 3: UI Rollout (Feature Flag)
-1. Deploy UI changes behind feature flag `ENABLE_PER_FINDING_ACTIONS`
-2. Enable for internal testing
-3. Gather feedback from contract reviewers
-4. Enable globally after validation
-
-### Phase 4: Documentation & Training
-1. Update user documentation with per-finding action examples
-2. Create video tutorial showing finding-level vs clause-level workflows
-3. Add tooltips in UI explaining when to use each mode
+### Phase 3: UI Rollout
+1. Replace clause-level `decision-buttons.tsx` with per-finding actions on finding cards
+2. Add "Accept All" / "Reset All" clause-wide shortcuts
+3. Add resolution progress to clause list items
+4. Add resolution status filter to clause list
+5. Update decision history log with finding badges and filter
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
-- Projection algorithm with mixed finding-level and clause-level decisions
-- Per-finding undo logic
-- Per-finding revert logic
-- Last-write-wins for text replacements
+- Projection: compute per-finding statuses from decision events
+- `deriveClauseStatus()`: all combinations (all resolved, some, none, escalated, zero findings)
+- Per-finding undo logic (only undoes that finding's last active decision)
+- Per-finding revert logic (marks all that finding's decisions inactive)
+- Last-write-wins for text replacements across findings
+- Legacy decisions (null findingId) ignored by projection
 
 ### Integration Tests
-- Apply decisions to multiple findings in same clause
-- Undo finding-level decision while clause-level decision exists
-- Export contract with finding-level decision audit trail
-- Backward compatibility: existing clause-level decisions still work
+- Apply decisions to multiple findings in same clause, verify independent statuses
+- Accept All: creates N decisions, clause becomes RESOLVED
+- Reset All: creates N REVERTs, clause becomes PENDING
+- Escalate one finding, verify others remain actionable
+- Clause list shows correct resolution progress after decisions
 
 ### E2E Tests
-- Reviewer accepts Finding A, applies Finding B's fallback, escalates Finding C
-- Undo Finding B's fallback, verify Finding A and C unchanged
-- Revert Finding A, verify all Finding A decisions marked inactive
+- Reviewer accepts Finding A, applies Finding B's fallback, escalates Finding C → clause shows 2/3 with escalation indicator
+- Undo Finding B's fallback, verify Finding A unchanged, clause shows 1/3
+- Accept All on clause with one escalated finding → only non-escalated accepted
+- Full clause resolution → left panel shows green "Resolved"
 
 ---
 
 ## Success Metrics
 
 ### Usability
-- **Target**: 80% of reviewers prefer finding-level actions over clause-level in user survey
 - **Target**: Average time to handle multi-finding clause reduces by 30%
+- **Target**: Reviewers can identify unresolved clauses at a glance via left panel progress
 
 ### Adoption
-- **Target**: 60% of decisions made at finding level within 2 weeks of rollout
-- **Target**: Per-finding undo used at least 10 times per week (indicates value)
+- **Target**: 90% of decisions made at finding level within 1 week (since it's the only option)
 
 ### Quality
 - **Target**: Zero data integrity issues (no orphaned decisions, correct projection)
@@ -617,42 +465,22 @@ function DecisionHistoryItem({ decision, finding }) {
 
 ## Open Questions
 
-1. **Should we allow applying multiple findings' fallbacks simultaneously?**  
-   → Proposed: No, keep last-write-wins. Allow sequential application with undo if wrong fallback chosen.
+1. **Should we allow applying multiple findings' fallbacks simultaneously?**
+   → Resolved: No, keep last-write-wins. Allow sequential application with undo if wrong fallback chosen.
 
-2. **What happens if a finding is deleted from the playbook but has active decisions?**  
-   → Proposed: `ON DELETE SET NULL` in FK - decision becomes clause-level, history preserved.
-
-3. **Should clause-level "Accept All" exist as a shortcut?**  
-   → Proposed: Yes, add "Accept All Findings" button that creates individual finding-level decisions for each finding.
-
-4. **How to visualize when the same clause has both clause-level and finding-level decisions?**  
-   → Proposed: Decision history shows both, with visual tags distinguishing them. Projection logic prioritizes finding-level over clause-level for status.
-
----
-
-## Appendix: Comparison Matrix
-
-| Feature | Clause-Level (Feature 006) | Finding-Level (Feature 011) |
-|---------|----------------------------|----------------------------|
-| Decision Scope | Entire clause | Individual finding |
-| Undo Granularity | Last clause action | Last finding action |
-| Multiple Fallbacks | Auto-select highest risk | User selects which finding |
-| Audit Trail | "Clause X accepted" | "Finding Y accepted" |
-| Escalation | Entire clause locked | Only specific finding locked |
-| Use Case | Simple clauses (1 finding) | Complex clauses (3+ findings) |
-| Backward Compatible | N/A | ✅ Yes (coexists) |
+2. **What happens if a finding is deleted but has active decisions?**
+   → Resolved: `ON DELETE SET NULL` in FK — decisions preserved as historical records with null findingId.
 
 ---
 
 ## References
 
-- Feature 006: Clause Decision Actions & Undo System (dependency)
+- Feature 006: Clause Decision Actions & Undo System (predecessor, replaced by finding-level)
 - Constitution Principle I: Data Integrity (append-only history)
 - User feedback: "Need to handle each finding separately" (2026-02-17)
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-02-17  
+**Document Version**: 2.0
+**Last Updated**: 2026-02-17
 **Author**: AI Assistant (based on user requirements)

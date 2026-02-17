@@ -5,7 +5,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,20 +15,19 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
-  CircleCheck,
-  MessageSquare,
   Swords,
   Search,
-  Send,
   Loader2,
   MapPin,
+  Check,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding, FindingComment, NegotiationItem, TriageDecision } from "./types";
 import type { ProjectionResult } from "@/types/decisions";
-import { DecisionButtons } from "./decision-buttons";
+import { FindingActions } from "./finding-actions";
 import { DecisionHistoryLog } from "./decision-history-log";
 
 interface FindingsPanelProps {
@@ -43,12 +41,15 @@ interface FindingsPanelProps {
     decision: TriageDecision,
     note?: string
   ) => void;
-  onCommentAdded?: (findingId: string, comment: FindingComment) => void;
   // NEW: Feature 006 - Decision actions
   projection?: ProjectionResult | null;
   onDecisionApplied?: () => void;
   historyRefreshKey?: number;
-  onEditManualClick?: () => void;  // T049: Trigger edit mode
+  onEditManualClick?: (findingId?: string) => void;
+  onEscalateClick?: (findingId: string) => void;
+  onNoteClick?: (findingId: string) => void;
+  currentUserId?: string;
+  currentUserRole?: string;
 }
 
 const severityOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
@@ -72,11 +73,14 @@ export function FindingsPanel({
   executiveSummary,
   negotiationItems = [],
   onTriageDecision,
-  onCommentAdded,
   projection,
   onDecisionApplied,
   historyRefreshKey,
   onEditManualClick,
+  onEscalateClick,
+  onNoteClick,
+  currentUserId,
+  currentUserRole,
 }: FindingsPanelProps) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [strategyOpen, setStrategyOpen] = useState(false);
@@ -173,6 +177,15 @@ export function FindingsPanel({
             {clause.clauseName} — {clause.findings.length} finding{clause.findings.length !== 1 ? "s" : ""}
           </p>
 
+          {/* T021: Accept All & Reset All shortcuts */}
+          {!finalized && clause.findings.length > 0 && (
+            <BulkActionButtons
+              clause={clause}
+              projection={projection}
+              onDecisionApplied={onDecisionApplied}
+            />
+          )}
+
           {sortedFindings.map((finding) => (
             <FindingCard
               key={finding.id}
@@ -180,41 +193,29 @@ export function FindingsPanel({
               finalized={finalized}
               contractId={contractId}
               onTriageDecision={onTriageDecision}
-              onCommentAdded={onCommentAdded}
+              clauseId={clause.id}
+              findingStatus={projection?.findingStatuses?.[finding.id]}
+              onDecisionApplied={onDecisionApplied}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+              clauseUpdatedAt={undefined}
+              onEscalateClick={onEscalateClick}
+              onNoteClick={onNoteClick}
+              onEditManualClick={onEditManualClick}
             />
           ))}
 
-          {/* Feature 006: Decision Actions & History */}
+          {/* Decision History */}
           {clause && (
-            <>
-              <Separator className="my-4" />
-              
-              {/* Decision Buttons */}
-              <div>
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">
-                  Decision Actions
-                </p>
-                <DecisionButtons
-                  clauseId={clause.id}
-                  clauseName={clause.clauseName}
-                  projection={projection}
-                  findings={clause.findings}
-                  onDecisionApplied={onDecisionApplied}
-                  onEditManualClick={onEditManualClick}
-                />
-              </div>
-
-              {/* Decision History */}
-              <div className="mt-6">
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">
-                  Decision History
-                </p>
-                <DecisionHistoryLog
-                  clauseId={clause.id}
-                  refreshTrigger={historyRefreshKey}
-                />
-              </div>
-            </>
+            <div className="mt-6">
+              <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">
+                Decision History
+              </p>
+              <DecisionHistoryLog
+                clauseId={clause.id}
+                refreshTrigger={historyRefreshKey}
+              />
+            </div>
           )}
         </div>
       </ScrollArea>
@@ -227,7 +228,15 @@ function FindingCard({
   finalized,
   contractId,
   onTriageDecision,
-  onCommentAdded,
+  clauseId,
+  findingStatus,
+  onDecisionApplied,
+  currentUserId,
+  currentUserRole,
+  clauseUpdatedAt,
+  onEscalateClick,
+  onNoteClick,
+  onEditManualClick,
 }: {
   finding: Finding;
   finalized: boolean;
@@ -237,44 +246,17 @@ function FindingCard({
     decision: TriageDecision,
     note?: string
   ) => void;
-  onCommentAdded?: (findingId: string, comment: FindingComment) => void;
+  clauseId: string;
+  findingStatus?: import("@/types/decisions").FindingStatusEntry;
+  onDecisionApplied?: () => void;
+  currentUserId?: string;
+  currentUserRole?: string;
+  clauseUpdatedAt?: string;
+  onEscalateClick?: (findingId: string) => void;
+  onNoteClick?: (findingId: string) => void;
+  onEditManualClick?: (findingId?: string) => void;
 }) {
-  const [addingComment, setAddingComment] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [posting, setPosting] = useState(false);
-
   const Icon = riskIcon[finding.riskLevel as keyof typeof riskIcon] ?? AlertCircle;
-
-  const handlePostComment = useCallback(async () => {
-    if (!commentText.trim()) return;
-    setPosting(true);
-    try {
-      const res = await fetch(
-        `/api/contracts/${contractId}/findings/${finding.id}/comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: commentText.trim() }),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(err.error || "Failed to post comment");
-        return;
-      }
-
-      const comment = await res.json();
-      setCommentText("");
-      setAddingComment(false);
-      onCommentAdded?.(finding.id, comment);
-      toast.success("Comment posted");
-    } catch {
-      toast.error("Failed to post comment");
-    } finally {
-      setPosting(false);
-    }
-  }, [commentText, contractId, finding.id, onCommentAdded]);
 
   return (
     <div
@@ -302,18 +284,6 @@ function FindingCard({
             {riskLabel[finding.riskLevel] ?? finding.riskLevel}
           </Badge>
         </div>
-        {finding.triageDecision && (
-          <Badge variant="outline" className={cn(
-            "text-[11px] shrink-0 px-2 py-0.5",
-            finding.triageDecision === "ACCEPT" ? "bg-risk-green-soft text-risk-green border-risk-green-border" :
-            finding.triageDecision === "NEEDS_REVIEW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
-            "bg-risk-red-soft text-risk-red border-risk-red-border"
-          )}>
-            <CircleCheck className="h-3 w-3 mr-0.5" />
-            {finding.triageDecision === "ACCEPT" ? "accept" :
-             finding.triageDecision === "NEEDS_REVIEW" ? "negotiate" : "escalate"}
-          </Badge>
-        )}
       </div>
 
       {/* Location (v2 format only) */}
@@ -349,80 +319,215 @@ function FindingCard({
         <p className="border-l-2 border-l-risk-green pl-2.5 text-[11px] text-muted-foreground">{finding.fallbackText}</p>
       )}
 
-      {/* Triage Buttons */}
-      {!finding.triageDecision && !finalized && (
-        <div className="flex gap-1.5 pt-1">
-          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "ACCEPT")}>
-            Accept
-          </Button>
-          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "NEEDS_REVIEW")}>
-            Negotiate
-          </Button>
-          <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={() => onTriageDecision(finding.id, "REJECT")}>
-            Escalate
-          </Button>
-        </div>
+      {/* Per-Finding Decision Actions (Feature 007) */}
+      {!finalized && clauseId && (
+        <FindingActions
+          finding={finding}
+          clauseId={clauseId}
+          contractId={contractId}
+          findingStatus={findingStatus}
+          onDecisionApplied={onDecisionApplied}
+          currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+          clauseUpdatedAt={clauseUpdatedAt}
+          onEscalateClick={onEscalateClick}
+          onNoteClick={onNoteClick}
+          onEditManualClick={onEditManualClick ? () => onEditManualClick(finding.id) : undefined}
+        />
       )}
+    </div>
+  );
+}
 
-      {/* Comments */}
-      {finding.comments.length > 0 && (
-        <div className="border-t pt-2 mt-1 space-y-1">
-          {finding.comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-1.5 text-[11px]">
-              <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-              <span>
-                <span className="font-medium text-foreground">{c.user.name}</span>{" "}
-                <span className="text-muted-foreground">{c.content}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+/**
+ * T021: Bulk Action Buttons - Accept All & Reset All
+ * Feature 007: Per-Finding Decision Actions
+ */
+function BulkActionButtons({
+  clause,
+  projection,
+  onDecisionApplied,
+}: {
+  clause: import("./types").Clause;
+  projection?: import("@/types/decisions").ProjectionResult | null;
+  onDecisionApplied?: () => void;
+}) {
+  const [isProcessing, setIsProcessing] = useState(false);
 
-      {/* Add comment */}
-      {!addingComment ? (
-        <button
-          onClick={() => setAddingComment(true)}
-          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <MessageSquare className="h-3 w-3" />
-          Add comment
-        </button>
-      ) : (
-        <div className="flex gap-1.5 pt-1">
-          <Textarea
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Add a comment..."
-            className="min-h-[60px] text-xs resize-none"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                handlePostComment();
-              }
-              if (e.key === "Escape") {
-                setAddingComment(false);
-                setCommentText("");
-              }
-            }}
-          />
-          <div className="flex flex-col gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="shrink-0 h-7 w-7"
-              disabled={!commentText.trim() || posting}
-              onClick={handlePostComment}
-            >
-              {posting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+  // Determine which buttons to show/enable
+  const findingStatuses = projection?.findingStatuses || {};
+  
+  // Accept All: only for findings that are PENDING (not escalated, not already resolved)
+  const acceptableFindings = clause.findings.filter((f) => {
+    const status = findingStatuses[f.id]?.status;
+    return !status || status === 'PENDING';
+  });
+  
+  // Reset All: only for findings that have active decisions
+  const resettableFindings = clause.findings.filter((f) => {
+    const status = findingStatuses[f.id]?.status;
+    return status && status !== 'PENDING';
+  });
+
+  const handleAcceptAll = async () => {
+    if (acceptableFindings.length === 0) {
+      toast.error('No findings to accept');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Accept all ${acceptableFindings.length} unresolved finding(s)? This will mark them as accepted.`
+    );
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    let succeeded = 0;
+    let failed = 0;
+    let errorMessage = '';
+
+    try {
+      for (const finding of acceptableFindings) {
+        try {
+          const response = await fetch(`/api/clauses/${clause.id}/decisions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              actionType: 'ACCEPT_DEVIATION',
+              findingId: finding.id,
+              payload: { comment: 'Bulk accept' },
+              clauseUpdatedAtWhenLoaded: new Date().toISOString(),
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to accept finding');
+          }
+
+          succeeded++;
+        } catch (err) {
+          failed++;
+          errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          // Stop on first failure per T021 error handling
+          break;
+        }
+      }
+
+      if (failed > 0) {
+        toast.error(
+          `${succeeded}/${acceptableFindings.length} completed — ${errorMessage}`
+        );
+      } else {
+        toast.success(`All ${succeeded} findings accepted`);
+      }
+
+      // Refresh UI with partial state
+      onDecisionApplied?.();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleResetAll = async () => {
+    if (resettableFindings.length === 0) {
+      toast.error('No findings to reset');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Reset all ${resettableFindings.length} finding(s) to pending? All decisions will be reverted. This action is recorded in the audit trail.`
+    );
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    let succeeded = 0;
+    let failed = 0;
+    let errorMessage = '';
+
+    try {
+      for (const finding of resettableFindings) {
+        try {
+          const response = await fetch(`/api/clauses/${clause.id}/decisions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              actionType: 'REVERT',
+              findingId: finding.id,
+              payload: {},
+              clauseUpdatedAtWhenLoaded: new Date().toISOString(),
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to revert finding');
+          }
+
+          succeeded++;
+        } catch (err) {
+          failed++;
+          errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          // Stop on first failure per T021 error handling
+          break;
+        }
+      }
+
+      if (failed > 0) {
+        toast.error(
+          `${succeeded}/${resettableFindings.length} completed — ${errorMessage}`
+        );
+      } else {
+        toast.success(`All ${succeeded} findings reset to pending`);
+      }
+
+      // Refresh UI with partial state
+      onDecisionApplied?.();
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-2 mb-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleAcceptAll}
+        disabled={isProcessing || acceptableFindings.length === 0}
+        className="text-xs h-7"
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <Check className="h-3 w-3 mr-1.5" />
+            Accept All ({acceptableFindings.length})
+          </>
+        )}
+      </Button>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleResetAll}
+        disabled={isProcessing || resettableFindings.length === 0}
+        className="text-xs h-7"
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <RotateCcw className="h-3 w-3 mr-1.5" />
+            Reset All ({resettableFindings.length})
+          </>
+        )}
+      </Button>
     </div>
   );
 }
