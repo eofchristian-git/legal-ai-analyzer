@@ -4,10 +4,16 @@
 // Main document viewer container with virtualized scrolling
 
 import React, { useState, useRef, useEffect } from 'react';
-import { VariableSizeList } from 'react-window';
+import dynamic from 'next/dynamic';
 import { HTMLRenderer } from './html-renderer';
 import { HighlightLayer } from './highlight-layer';
 import type { DocumentViewerProps } from '@/types/document-viewer';
+
+// Dynamic import for react-window to avoid SSR issues
+const List = dynamic(
+  () => import('react-window').then((mod: any) => mod.List),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><div className="text-gray-400">Loading...</div></div> }
+) as any;
 
 export function DocumentViewer({
   contractId,
@@ -19,12 +25,15 @@ export function DocumentViewer({
   onClauseClick,
   onFindingClick,
 }: DocumentViewerProps) {
-  const listRef = useRef<VariableSizeList>(null);
+  const listRef = useRef<any>(null);
   const [loadedPages, setLoadedPages] = useState<Set<number>>(new Set([1]));
   const [viewerHeight, setViewerHeight] = useState(800); // Default height
+  const [isClient, setIsClient] = useState(false);
 
   // Set viewer height on mount (client-side only)
   useEffect(() => {
+    setIsClient(true);
+    
     if (typeof window !== 'undefined') {
       setViewerHeight(window.innerHeight - 200);
       
@@ -45,33 +54,31 @@ export function DocumentViewer({
     return [htmlContent];
   }, [htmlContent]);
 
-  // Calculate page height (fixed for now, would be dynamic in production)
-  const getItemSize = (index: number) => {
-    return 1200; // Fixed height per page
-  };
-
   // Handle scroll events to load pages progressively
-  const handleScroll = ({ scrollOffset }: { scrollOffset: number }) => {
-    const currentPage = Math.floor(scrollOffset / 1200) + 1;
-    
-    // Load surrounding pages
-    const pagesToLoad = new Set(loadedPages);
-    for (let i = Math.max(1, currentPage - 1); i <= Math.min(pageCount, currentPage + 2); i++) {
-      pagesToLoad.add(i);
-    }
-    
-    if (pagesToLoad.size !== loadedPages.size) {
-      setLoadedPages(pagesToLoad);
+  const handleScroll = (event: any) => {
+    if (event.scrollOffset) {
+      const scrollOffset = event.scrollOffset;
+      const currentPage = Math.floor(scrollOffset / 1200) + 1;
+      
+      // Load surrounding pages
+      const pagesToLoad = new Set(loadedPages);
+      for (let i = Math.max(1, currentPage - 1); i <= Math.min(pageCount, currentPage + 2); i++) {
+        pagesToLoad.add(i);
+      }
+      
+      if (pagesToLoad.size !== loadedPages.size) {
+        setLoadedPages(pagesToLoad);
+      }
     }
   };
 
   // Render a single page
-  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const Row = React.forwardRef<HTMLDivElement, any>(({ index, ...props }, ref) => {
     const pageNum = index + 1;
     const isLoaded = loadedPages.has(pageNum);
 
     return (
-      <div style={style}>
+      <div ref={ref} {...props}>
         {isLoaded ? (
           <div className="relative bg-white shadow-lg rounded-sm p-8 mx-auto" style={{ maxWidth: '800px' }}>
             {/* HTML Content */}
@@ -95,22 +102,30 @@ export function DocumentViewer({
         )}
       </div>
     );
-  };
+  });
+
+  // Show loading state during SSR or while client is mounting
+  if (!isClient) {
+    return (
+      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-400">Loading document viewer...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full bg-gray-100">
       {htmlContent ? (
-        <VariableSizeList
-          ref={listRef}
-          height={viewerHeight}
-          itemCount={pages.length}
-          itemSize={getItemSize}
-          width="100%"
+        <List
+          listRef={listRef}
+          defaultHeight={viewerHeight}
+          rowCount={pages.length}
+          rowHeight={1200}
           overscanCount={2}
           onScroll={handleScroll}
-        >
-          {Row}
-        </VariableSizeList>
+          rowComponent={Row}
+          rowProps={{}}
+        />
       ) : (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">

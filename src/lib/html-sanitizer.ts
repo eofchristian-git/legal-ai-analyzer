@@ -45,10 +45,8 @@ export function sanitizeHTML(html: string): string {
     ],
     
     // Allow data URIs for images (base64 embedded images from Word/PDF)
+    // and other safe protocols (http, https, mailto, etc.)
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-    
-    // Allow specific URL protocols
-    ALLOWED_SCHEMES: ['data', 'http', 'https', 'mailto'],
     
     // Keep HTML structure
     KEEP_CONTENT: true,

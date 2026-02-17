@@ -2,15 +2,16 @@
 // Document conversion utilities (Word/PDF → HTML)
 
 import mammoth from 'mammoth';
-import * as pdfjsLib from 'pdfjs-dist';
 import type { ConversionOptions, ConversionResult } from '@/types/document-viewer';
 
-// Configure PDF.js worker
+// Conditional import of PDF.js based on environment
+let pdfjsLib: any;
 if (typeof window === 'undefined') {
-  // Server-side: use node canvas (will need to install if we use this server-side)
-  // For now, PDF conversion will be done client-side or with puppeteer
+  // Server-side: use legacy build for Node.js compatibility
+  pdfjsLib = require('pdfjs-dist/legacy/build/pdf.mjs');
 } else {
-  // Client-side: use web worker
+  // Client-side: use standard build with web worker
+  pdfjsLib = require('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js';
 }
 
@@ -119,7 +120,7 @@ export async function convertPDFToHTML(
  * Convert a single PDF page to HTML
  */
 async function convertPDFPage(
-  page: pdfjsLib.PDFPageProxy,
+  page: any, // PDFPageProxy type
   pageNum: number
 ): Promise<string> {
   // Get viewport
