@@ -109,8 +109,7 @@ export async function GET(
       headers: {
         // Cache for 5 minutes
         'Cache-Control': 'private, max-age=300',
-        // Enable gzip compression
-        'Content-Encoding': 'gzip',
+        // Next.js handles compression automatically, don't set Content-Encoding manually
       },
     });
 
