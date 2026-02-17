@@ -28,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import { DecisionActionType, ProjectionResult } from '@/types/decisions';
 import { EscalateModal } from './escalate-modal';  // T056: Feature 006
+import { NoteInput } from './note-input';  // T069: Feature 006
 
 interface Finding {
   id: string;
@@ -56,6 +57,8 @@ export function DecisionButtons({
   const [isLoading, setIsLoading] = useState(false);
   // T056: Escalate modal state
   const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+  // T069: Note input modal state
+  const [noteInputOpen, setNoteInputOpen] = useState(false);
 
   // T038: Check if fallback language is available
   const hasFallbackLanguage = findings.some((f) => f.fallbackText && f.fallbackText.trim().length > 0);
@@ -347,7 +350,7 @@ export function DecisionButtons({
       </Button>
 
       <Button
-        onClick={() => toast.info('Add note - Phase 9')}
+        onClick={() => setNoteInputOpen(true)}
         disabled={isLoading}
         variant="outline"
         size="sm"
@@ -396,6 +399,17 @@ export function DecisionButtons({
         clauseId={clauseId}
         clauseName={clauseName}
         onEscalated={() => {
+          onDecisionApplied?.();
+        }}
+      />
+
+      {/* T069: Note Input Modal */}
+      <NoteInput
+        open={noteInputOpen}
+        onOpenChange={setNoteInputOpen}
+        clauseId={clauseId}
+        clauseName={clauseName}
+        onNoteSaved={() => {
           onDecisionApplied?.();
         }}
       />
