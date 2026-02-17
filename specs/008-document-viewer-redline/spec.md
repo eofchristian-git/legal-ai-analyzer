@@ -36,7 +36,7 @@ A legal reviewer is working through the clause list on the left side of the scre
 **Acceptance Scenarios**:
 
 1. **Given** the contract detail page is open with the clause list visible, **When** the user clicks on a clause in the left panel, **Then** the document viewer scrolls to that clause's position and highlights it with a visual indicator (e.g., yellow border or subtle background)
-2. **Given** the user is viewing a clause in the document, **When** they manually scroll down to view another clause, **Then** the selected clause in the left panel automatically updates to reflect the currently visible clause
+2. **Given** the user is viewing a clause in the document, **When** they manually scroll down to view another clause and stop scrolling, **Then** the selected clause in the left panel automatically updates after 200-300ms to reflect the currently visible clause
 3. **Given** a clause spans multiple pages or screens, **When** the user clicks on it in the left panel, **Then** the document scrolls to the beginning of that clause
 4. **Given** the user is navigating between clauses quickly, **When** they click multiple clauses in rapid succession, **Then** the document smoothly scrolls to each position without lag or jumping
 5. **Given** a long contract with 50+ clauses, **When** the user scrolls through the document, **Then** the left panel auto-scrolls to keep the currently visible clause in view
@@ -72,8 +72,8 @@ A legal reviewer has completed their review and made all necessary decisions. Th
 
 **Acceptance Scenarios**:
 
-1. **Given** all findings have been resolved and decisions made, **When** the user clicks "Export Redline" button, **Then** a modal opens with export format options (Word .docx or PDF)
-2. **Given** the export modal is open, **When** the user selects Word .docx format and confirms, **Then** a Word document is generated and downloaded with all tracked changes in Microsoft Word's Track Changes format
+1. **Given** all findings have been resolved and decisions made, **When** the user clicks "Export Redline" button, **Then** a modal opens with Word (.docx) selected by default and an option to choose PDF instead
+2. **Given** the export modal is open with Word format selected, **When** the user confirms export, **Then** a Word document is generated and downloaded with all tracked changes in Microsoft Word's Track Changes format
 3. **Given** the export modal is open, **When** the user selects PDF format and confirms, **Then** a PDF is generated and downloaded with visual indication of changes (strikethrough and underline)
 4. **Given** a redlined document is exported, **When** the user opens the file, **Then** it includes metadata in a header or properties (contract title, counterparty, export date, reviewing organization)
 5. **Given** multiple users have made decisions on the contract, **When** a redlined document is exported, **Then** each change is attributed to the user who made it (shown in comments or change tracking)
@@ -136,8 +136,13 @@ A legal reviewer is working through a long contract with many findings. They wan
 - How does the system handle concurrent edits when multiple users are reviewing the same contract?
   - The existing optimistic locking system (Feature 006) applies; redline export includes all finalized changes at time of export
   
-- What happens if document conversion (PDF to HTML) fails or produces poor results?
-  - System falls back to displaying the original PDF with basic highlight overlays; a warning notifies the user of limited editing capabilities
+- What happens if document conversion (Word/PDF to HTML) fails or produces poor results?
+  - System retries conversion with alternative settings; if still failing, displays an error and prevents analysis from completing; user must upload a different version of the document
+  
+- How long is the HTML-converted document and position data retained?
+  - Finalized contracts: Retained indefinitely to ensure historical contracts can always be viewed
+  - Draft/cancelled contracts: Automatically deleted after 90 days to manage storage costs
+  - Original uploaded documents (Word/PDF) are always retained regardless of status
 
 ## Requirements *(mandatory)*
 
@@ -146,71 +151,77 @@ A legal reviewer is working through a long contract with many findings. They wan
 #### Document Rendering & Display
 
 - **FR-001**: System MUST render the full contract document in a scrollable viewer that preserves the original layout and formatting
-- **FR-002**: System MUST support rendering documents up to 200 pages without significant performance degradation (target: load within 5 seconds)
-- **FR-003**: System MUST display the document with sufficient zoom/scale for readability on desktop and tablet devices
-- **FR-004**: System MUST maintain document aspect ratio and page boundaries when rendering
-- **FR-005**: System MUST support both PDF source documents and HTML-converted documents
+- **FR-002**: System MUST convert all source formats (Word .docx and PDF) to HTML during the analysis phase for unified rendering
+- **FR-003**: System MUST support rendering documents up to 200 pages without significant performance degradation (target: load within 5 seconds)
+- **FR-004**: System MUST display the document with sufficient zoom/scale for readability on desktop and tablet devices
+- **FR-005**: System MUST maintain document aspect ratio and page boundaries when rendering
+- **FR-006**: System MUST preserve formatting (fonts, styles, tables, images) during document conversion to HTML
 
 #### Finding Highlights & Visualization
 
-- **FR-006**: System MUST highlight finding locations in the document using color-coded overlays (RED for high risk, YELLOW for medium risk, GREEN for low risk)
-- **FR-007**: System MUST position highlights accurately at the finding's location using the `locationPage` and `locationPosition` metadata from Feature 005
-- **FR-008**: System MUST display finding highlights as semi-transparent overlays that allow the underlying text to remain readable
-- **FR-009**: System MUST show a tooltip on hover over a highlight containing the finding summary and matched rule title
-- **FR-010**: System MUST make highlights clickable to open the findings panel for that clause
-- **FR-011**: System MUST handle overlapping highlights by displaying the highest risk color and indicating multiple findings with a badge
+- **FR-007**: System MUST highlight finding locations in the document using color-coded overlays (RED for high risk, YELLOW for medium risk, GREEN for low risk)
+- **FR-008**: System MUST position highlights accurately at the finding's location using the `locationPage` and `locationPosition` metadata from Feature 005
+- **FR-009**: System MUST display finding highlights as semi-transparent overlays that allow the underlying text to remain readable
+- **FR-010**: System MUST show a tooltip on hover over a highlight containing the finding summary and matched rule title
+- **FR-011**: System MUST make highlights clickable to open the findings panel for that clause
+- **FR-012**: System MUST handle overlapping highlights by displaying the highest risk color and indicating multiple findings with a badge
 
 #### Navigation & Synchronization
 
-- **FR-012**: System MUST scroll the document viewer to a clause's position when the clause is clicked in the left panel
-- **FR-013**: System MUST visually indicate the active clause in the document with a border or background highlight
-- **FR-014**: System MUST update the selected clause in the left panel when the user manually scrolls to a different clause in the document (bi-directional sync)
-- **FR-015**: System MUST smooth-scroll to clause positions with animation to maintain user context
-- **FR-016**: System MUST auto-scroll the left clause list to keep the currently visible clause in view
-- **FR-017**: System MUST provide "Next Finding" and "Previous Finding" navigation buttons
-- **FR-018**: System MUST support keyboard shortcuts (Ctrl/Cmd + ↓/↑) for finding navigation
-- **FR-019**: System MUST display a finding counter showing current position and total (e.g., "Finding 2 of 7")
-- **FR-020**: System MUST show markers on the document scrollbar at finding positions
+- **FR-013**: System MUST scroll the document viewer to a clause's position when the clause is clicked in the left panel
+- **FR-014**: System MUST visually indicate the active clause in the document with a border or background highlight
+- **FR-015**: System MUST update the selected clause in the left panel when the user manually scrolls to a different clause in the document (bi-directional sync)
+- **FR-016**: System MUST debounce scroll sync updates by 200-300ms after scrolling stops to prevent excessive UI updates during active scrolling
+- **FR-017**: System MUST smooth-scroll to clause positions with animation to maintain user context
+- **FR-018**: System MUST auto-scroll the left clause list to keep the currently visible clause in view
+- **FR-019**: System MUST provide "Next Finding" and "Previous Finding" navigation buttons
+- **FR-020**: System MUST support keyboard shortcuts (Ctrl/Cmd + ↓/↑) for finding navigation
+- **FR-021**: System MUST display a finding counter showing current position and total (e.g., "Finding 2 of 7")
+- **FR-022**: System MUST show markers on the document scrollbar at finding positions
 
 #### Tracked Changes Display
 
-- **FR-021**: System MUST provide a "Show Tracked Changes" toggle to switch between original and change-marked views
-- **FR-022**: System MUST display deleted text with red strikethrough when tracked changes are enabled
-- **FR-023**: System MUST display inserted/replaced text with green or blue underline when tracked changes are enabled
-- **FR-024**: System MUST position tracked changes inline at the exact location in the document where the change applies
-- **FR-025**: System MUST show a tooltip on hover over a change indicating the type (accept deviation, apply fallback, manual edit), user, and timestamp
-- **FR-026**: System MUST display a legend showing change types and user attribution
-- **FR-027**: System MUST exclude undone or reverted decisions from the tracked changes display
-- **FR-028**: System MUST only show tracked changes for text modifications (fallbacks and manual edits), not for accepted deviations (which have no text changes)
-- **FR-029**: System MUST support toggling tracked changes on/off without reloading the document
+- **FR-023**: System MUST provide a "Show Tracked Changes" toggle to switch between original and change-marked views
+- **FR-024**: System MUST display deleted text with red strikethrough when tracked changes are enabled
+- **FR-025**: System MUST display inserted/replaced text with green or blue underline when tracked changes are enabled
+- **FR-026**: System MUST position tracked changes inline at the exact location in the document where the change applies
+- **FR-027**: System MUST show a tooltip on hover over a change indicating the type (accept deviation, apply fallback, manual edit), user, and timestamp
+- **FR-028**: System MUST display a legend showing change types and user attribution
+- **FR-029**: System MUST exclude undone or reverted decisions from the tracked changes display
+- **FR-030**: System MUST only show tracked changes for text modifications (fallbacks and manual edits), not for accepted deviations (which have no text changes)
+- **FR-031**: System MUST support toggling tracked changes on/off without reloading the document
 
 #### Redline Export
 
-- **FR-030**: System MUST provide an "Export Redline" button in the contract header
-- **FR-031**: System MUST support exporting redlined documents in Word (.docx) format
-- **FR-032**: System MUST support exporting redlined documents in PDF format
-- **FR-033**: System MUST include all tracked changes in the exported document using standard formatting (strikethrough for deletions, underline for insertions)
-- **FR-034**: System MUST include metadata in exported documents (contract title, counterparty name, export date, reviewing organization)
-- **FR-035**: System MUST attribute changes to the users who made them (shown in Word Track Changes or PDF comments)
-- **FR-036**: System MUST generate exports for contracts with 200+ pages within 30 seconds
-- **FR-037**: System MUST allow export even if the contract has not been finalized, with an appropriate warning
-- **FR-038**: System MUST handle clauses with no modifications (accepted deviations only) by showing them in original form without markup
+- **FR-032**: System MUST provide an "Export Redline" button in the contract header
+- **FR-033**: System MUST default to Word (.docx) format for redline exports with an option for users to choose PDF format instead
+- **FR-034**: System MUST support exporting redlined documents in Word (.docx) format with Track Changes enabled
+- **FR-035**: System MUST support exporting redlined documents in PDF format as an alternative option
+- **FR-036**: System MUST include all tracked changes in the exported document using standard formatting (strikethrough for deletions, underline for insertions)
+- **FR-037**: System MUST include metadata in exported documents (contract title, counterparty name, export date, reviewing organization)
+- **FR-038**: System MUST attribute changes to the users who made them (shown in Word Track Changes or PDF comments)
+- **FR-039**: System MUST generate exports for contracts with 200+ pages within 30 seconds
+- **FR-040**: System MUST allow export even if the contract has not been finalized, with an appropriate warning
+- **FR-041**: System MUST handle clauses with no modifications (accepted deviations only) by showing them in original form without markup
 
 #### Data & Position Mapping
 
-- **FR-039**: System MUST store clause position mappings (page, x, y, width, height) for accurate rendering
-- **FR-040**: System MUST store finding position mappings using the existing `locationPage` and `locationPosition` fields from Feature 005
-- **FR-041**: System MUST recalculate position mappings if the document structure changes due to edits
-- **FR-042**: System MUST maintain position accuracy within 50 pixels for PDF rendering and 1 paragraph for HTML rendering
-- **FR-043**: System MUST handle cases where exact position mapping fails by falling back to clause-level positioning
+- **FR-042**: System MUST create the ContractDocument entity during the analysis phase (when AI processes the document) and populate it with page count, clause positions, and finding positions
+- **FR-043**: System MUST store clause position mappings (page, x, y, width, height) for accurate rendering
+- **FR-044**: System MUST store finding position mappings using the existing `locationPage` and `locationPosition` fields from Feature 005
+- **FR-045**: System MUST recalculate position mappings if the document structure changes due to edits
+- **FR-046**: System MUST maintain position accuracy within 1 paragraph for HTML rendering
+- **FR-047**: System MUST handle cases where exact position mapping fails by falling back to clause-level positioning
+- **FR-048**: System MUST retain ContractDocument data (HTML content and position mappings) indefinitely for finalized contracts
+- **FR-049**: System MUST delete ContractDocument data after 90 days for draft or cancelled contracts to manage storage costs
 
 #### Performance & Scalability
 
-- **FR-044**: System MUST render documents using virtualized scrolling to support large documents (200+ pages)
-- **FR-045**: System MUST load and display the first page of the document within 3 seconds
-- **FR-046**: System MUST progressively load document pages as the user scrolls
-- **FR-047**: System MUST cache rendered pages to improve scrolling performance
-- **FR-048**: System MUST support concurrent access by multiple users viewing the same contract document
+- **FR-050**: System MUST render documents using virtualized scrolling to support large documents (200+ pages)
+- **FR-051**: System MUST load and display the first page of the document within 3 seconds
+- **FR-052**: System MUST progressively load document pages as the user scrolls
+- **FR-053**: System MUST cache rendered pages to improve scrolling performance
+- **FR-054**: System MUST support concurrent access by multiple users viewing the same contract document
 
 ### Key Entities
 
@@ -226,6 +237,16 @@ A legal reviewer is working through a long contract with many findings. They wan
   - Attributes: contractId, format (DOCX or PDF), exportedBy, exportedAt, filePath, includesChanges, metadata (JSON)
   - Relationships: Many-to-one with Contract
 
+## Clarifications
+
+### Session 2026-02-17
+
+- Q: When should the ContractDocument entity be created and populated with position data? → A: Create during the analysis phase when the AI processes the document
+- Q: What is the primary document rendering approach given that most contracts are Word documents with occasional PDFs? → A: Convert all formats (Word and PDF) to HTML for unified rendering
+- Q: What should be the default export format for redlined documents? → A: Default to Word (.docx); users can optionally choose PDF
+- Q: When should the selected clause in the left panel update during manual document scrolling? → A: Update when scrolling stops (debounced after 200-300ms)
+- Q: How long should HTML-converted documents and position data be retained? → A: Retain indefinitely for finalized contracts; delete after 90 days for draft/cancelled contracts
+
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
@@ -233,7 +254,7 @@ A legal reviewer is working through a long contract with many findings. They wan
 - **SC-001**: Legal reviewers can locate a specific finding in the full document context in under 5 seconds (compared to ~30 seconds with current clause-by-clause view)
 - **SC-002**: Document viewer loads and displays the first page of contracts up to 200 pages within 3 seconds on standard business hardware
 - **SC-003**: 90% of users report improved understanding of findings with full document context (measured via user survey)
-- **SC-004**: Finding highlights are positioned within 50 pixels of the actual text location for PDF rendering and within 1 paragraph for HTML rendering
+- **SC-004**: Finding highlights are positioned within 1 paragraph of the actual text location in the HTML-rendered document
 - **SC-005**: Users can navigate between findings using keyboard shortcuts or buttons with less than 500ms response time
 - **SC-006**: Tracked changes display correctly shows all text modifications (fallbacks and manual edits) with proper strikethrough and underline formatting
 - **SC-007**: Redlined documents export successfully for 100% of finalized contracts within 30 seconds
