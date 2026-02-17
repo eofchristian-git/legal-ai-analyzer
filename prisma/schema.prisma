@@ -44,8 +44,39 @@ model Contract {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  analysis     ContractAnalysis?
-  activityLogs ActivityLog[]
+  analysis         ContractAnalysis?
+  activityLogs     ActivityLog[]
+  contractDocument ContractDocument?  // NEW: Document viewer data (Feature 008)
+}
+
+// NEW: ContractDocument model for document viewer (Feature 008)
+model ContractDocument {
+  id                String   @id @default(cuid())
+  contractId        String   @unique
+  contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Original document
+  originalPdfPath   String
+  
+  // Converted content
+  htmlContent       String?  // Nullable until conversion completes
+  pageCount         Int
+  
+  // Position mappings (stored as JSON)
+  clausePositions   String   @default("[]")  // JSON array of ClausePosition
+  findingPositions  String   @default("[]")  // JSON array of FindingPosition
+  
+  // Conversion status
+  conversionStatus  String   @default("pending")  // 'pending' | 'processing' | 'completed' | 'failed'
+  conversionError   String?
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([contractId])
+  @@index([conversionStatus])
+  @@index([createdAt])
 }
 
 model ContractAnalysis {

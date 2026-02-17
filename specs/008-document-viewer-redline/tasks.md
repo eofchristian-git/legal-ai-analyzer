@@ -20,14 +20,14 @@
 
 **Purpose**: Install dependencies and configure database schema
 
-- [ ] T001 Install document conversion dependencies: `npm install mammoth pdfjs-dist isomorphic-dompurify`
-- [ ] T002 Install export dependencies: `npm install docx puppeteer`
-- [ ] T003 Install rendering dependencies: `npm install react-window @types/react-window`
-- [ ] T004 Copy pdf.worker.js to public directory: `cp node_modules/pdfjs-dist/build/pdf.worker.js public/`
-- [ ] T005 Add ContractDocument model to `prisma/schema.prisma` with fields: id, contractId, originalPdfPath, htmlContent, pageCount, clausePositions, findingPositions, conversionStatus, conversionError, createdAt, updatedAt
-- [ ] T006 Add ContractDocument relationship to Contract model in `prisma/schema.prisma`
-- [ ] T007 Run Prisma migration: `npx prisma migrate dev --name add-contract-document`
-- [ ] T008 Generate Prisma client: `npx prisma generate`
+- [X] T001 Install document conversion dependencies: `npm install mammoth pdfjs-dist isomorphic-dompurify`
+- [X] T002 Install export dependencies: `npm install docx puppeteer`
+- [X] T003 Install rendering dependencies: `npm install react-window @types/react-window`
+- [X] T004 Copy pdf.worker.js to public directory: `cp node_modules/pdfjs-dist/build/pdf.worker.js public/`
+- [X] T005 Add ContractDocument model to `prisma/schema.prisma` with fields: id, contractId, originalPdfPath, htmlContent, pageCount, clausePositions, findingPositions, conversionStatus, conversionError, createdAt, updatedAt
+- [X] T006 Add ContractDocument relationship to Contract model in `prisma/schema.prisma`
+- [X] T007 Run Prisma migration: `npx prisma migrate dev --name add-contract-document`
+- [X] T008 Generate Prisma client: `npx prisma generate`
 
 ---
 
@@ -37,13 +37,13 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T009 [P] Create TypeScript interfaces in `src/types/document-viewer.ts`: ClausePosition, FindingPosition, ConversionOptions, DocumentViewerProps
-- [ ] T010 [P] Create document conversion utilities in `src/lib/document-converter.ts`: convertWordToHTML(), convertPDFToHTML(), detectFormat()
-- [ ] T011 [P] Create position mapping utilities in `src/lib/position-mapper.ts`: calculatePositions(), injectClauseMarkers(), calculateFindingPositions()
-- [ ] T012 [P] Create HTML sanitization wrapper in `src/lib/html-sanitizer.ts`: sanitizeHTML() using DOMPurify
-- [ ] T013 Create internal conversion API endpoint `src/app/api/documents/convert/route.ts`: POST handler for document conversion (called from analysis)
-- [ ] T014 Modify analysis endpoint `src/app/api/contracts/[id]/analyze/route.ts`: Add document conversion trigger after AI analysis completes
-- [ ] T015 Create document viewer API endpoint `src/app/api/contracts/[id]/document/route.ts`: GET handler to fetch HTML and position mappings
+- [X] T009 [P] Create TypeScript interfaces in `src/types/document-viewer.ts`: ClausePosition, FindingPosition, ConversionOptions, DocumentViewerProps
+- [X] T010 [P] Create document conversion utilities in `src/lib/document-converter.ts`: convertWordToHTML(), convertPDFToHTML(), detectFormat()
+- [X] T011 [P] Create position mapping utilities in `src/lib/position-mapper.ts`: calculatePositions(), injectClauseMarkers(), calculateFindingPositions()
+- [X] T012 [P] Create HTML sanitization wrapper in `src/lib/html-sanitizer.ts`: sanitizeHTML() using DOMPurify
+- [X] T013 Create internal conversion API endpoint `src/app/api/documents/convert/route.ts`: POST handler for document conversion (called from analysis)
+- [X] T014 Modify analysis endpoint `src/app/api/contracts/[id]/analyze/route.ts`: Add document conversion trigger after AI analysis completes
+- [X] T015 Create document viewer API endpoint `src/app/api/contracts/[id]/document/route.ts`: GET handler to fetch HTML and position mappings
 
 **Checkpoint**: Foundation ready - document conversion pipeline works, user story implementation can now begin in parallel
 

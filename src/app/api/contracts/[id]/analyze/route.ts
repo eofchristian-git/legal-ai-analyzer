@@ -4,8 +4,68 @@ import { buildContractReviewPrompt } from "@/lib/prompts";
 import { analyzeWithClaude } from "@/lib/claude";
 import { parseContractAnalysis } from "@/lib/analysis-parser";
 import { getSessionOrUnauthorized } from "@/lib/auth-utils";
+import fs from "fs/promises";
 
 export const maxDuration = 180; // Allow up to 3 minutes for Claude to respond
+
+/**
+ * Feature 008: Trigger document conversion after analysis completes
+ * This is a fire-and-forget function that converts the document to HTML
+ */
+async function triggerDocumentConversion(
+  contractId: string,
+  filePath: string,
+  filename: string
+): Promise<void> {
+  try {
+    console.log(`[DocConversion] Starting conversion for contract ${contractId}`);
+    
+    // Read the file from disk
+    const fileBuffer = await fs.readFile(filePath);
+    
+    // Create a FormData-like object for the internal API
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer], { type: 'application/octet-stream' });
+    const file = new File([blob], filename);
+    formData.append('file', file);
+    formData.append('contractId', contractId);
+    
+    // Call the internal conversion API
+    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/documents/convert`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Conversion API error: ${error.error || 'Unknown error'}`);
+    }
+    
+    const result = await response.json();
+    console.log(`[DocConversion] Completed for contract ${contractId}: ${result.message}`);
+  } catch (error) {
+    console.error(`[DocConversion] Failed for contract ${contractId}:`, error);
+    
+    // Try to update the ContractDocument status to 'failed'
+    try {
+      const existingDoc = await db.contractDocument.findUnique({
+        where: { contractId },
+      });
+      
+      if (existingDoc) {
+        await db.contractDocument.update({
+          where: { id: existingDoc.id },
+          data: {
+            conversionStatus: 'failed',
+            conversionError: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+      }
+    } catch (dbError) {
+      console.error(`[DocConversion] Failed to update status:`, dbError);
+    }
+  }
+}
 
 /**
  * Run the actual analysis work in the background.
@@ -365,6 +425,13 @@ async function runAnalysis(id: string, userId: string | null) {
         },
       });
     }
+
+    // Feature 008: Trigger document conversion (fire-and-forget)
+    // This will convert the document to HTML and calculate positions for the document viewer
+    triggerDocumentConversion(id, contract.document.filePath, contract.document.filename).catch((err) => {
+      console.error(`[Analyze] Failed to trigger document conversion for contract ${id}:`, err);
+      // Don't fail the analysis if conversion fails - viewer will show error state
+    });
   } catch (error) {
     console.error(`[Analyze] Background analysis failed for contract ${id}:`, error);
 
