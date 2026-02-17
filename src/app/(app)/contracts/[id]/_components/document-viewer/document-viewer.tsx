@@ -4,7 +4,7 @@
 // Main document viewer container with virtualized scrolling
 
 import React, { useState, useRef, useEffect } from 'react';
-import { VariableSizeList as List } from 'react-window';
+import { VariableSizeList } from 'react-window';
 import { HTMLRenderer } from './html-renderer';
 import { HighlightLayer } from './highlight-layer';
 import type { DocumentViewerProps } from '@/types/document-viewer';
@@ -19,8 +19,24 @@ export function DocumentViewer({
   onClauseClick,
   onFindingClick,
 }: DocumentViewerProps) {
-  const listRef = useRef<List>(null);
+  const listRef = useRef<VariableSizeList>(null);
   const [loadedPages, setLoadedPages] = useState<Set<number>>(new Set([1]));
+  const [viewerHeight, setViewerHeight] = useState(800); // Default height
+
+  // Set viewer height on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setViewerHeight(window.innerHeight - 200);
+      
+      // Update on resize
+      const handleResize = () => {
+        setViewerHeight(window.innerHeight - 200);
+      };
+      
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
 
   // Split HTML into pages (simple implementation - production would use actual page breaks)
   const pages = React.useMemo(() => {
@@ -84,9 +100,9 @@ export function DocumentViewer({
   return (
     <div className="w-full h-full bg-gray-100">
       {htmlContent ? (
-        <List
+        <VariableSizeList
           ref={listRef}
-          height={window.innerHeight - 200} // Adjust based on layout
+          height={viewerHeight}
           itemCount={pages.length}
           itemSize={getItemSize}
           width="100%"
@@ -94,7 +110,7 @@ export function DocumentViewer({
           onScroll={handleScroll}
         >
           {Row}
-        </List>
+        </VariableSizeList>
       ) : (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
