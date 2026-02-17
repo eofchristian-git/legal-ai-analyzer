@@ -2,8 +2,7 @@
 // Internal API endpoint for document conversion (called from analysis workflow)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { convertDocument, detectFormat } from '@/lib/document-converter';
 import { calculatePositions, injectClauseMarkers } from '@/lib/position-mapper';
@@ -18,7 +17,7 @@ import fs from 'fs/promises';
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(
         { success: false, error: 'Authentication required' },
