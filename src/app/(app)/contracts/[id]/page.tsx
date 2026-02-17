@@ -33,8 +33,10 @@ import { ClauseText } from "./_components/clause-text";
 import { FindingsPanel } from "./_components/findings-panel";
 import { RiskHeatmap } from "./_components/risk-heatmap";
 import { ActivityTimeline } from "./_components/activity-timeline";
+import { EscalateModal } from "./_components/escalate-modal";
+import { NoteInput } from "./_components/note-input";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
-import type { ProjectionResult } from "@/types/decisions"; // T031: Feature 006
+import type { ProjectionResult } from "@/types/decisions";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -53,6 +55,17 @@ export default function ContractDetailPage() {
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   // T048: Feature 006 - Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
+  // Feature 007: Finding-level modal state
+  const [escalateModalOpen, setEscalateModalOpen] = useState(false);
+  const [noteInputOpen, setNoteInputOpen] = useState(false);
+  const [activeModalFindingId, setActiveModalFindingId] = useState<string | null>(null);
+  const [editingFindingId, setEditingFindingId] = useState<string | null>(null);
+  // Feature 007 T011: Clause projection map for resolution progress
+  const [clauseProjections, setClauseProjections] = useState<Record<string, { 
+    resolvedCount: number; 
+    totalFindingCount: number; 
+    effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
+  }>>({});
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
   const isRedirecting = useRef(false);
@@ -151,6 +164,48 @@ export default function ContractDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analyzing, params.id]);
 
+  // T011: Fetch projections for all clauses when contract is loaded
+  useEffect(() => {
+    const fetchAllProjections = async () => {
+      if (!contract?.analysis?.clauses) return;
+
+      const clauses = contract.analysis.clauses;
+      const projections: Record<string, { 
+        resolvedCount: number; 
+        totalFindingCount: number; 
+        effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
+      }> = {};
+
+      // Fetch projections for all clauses in parallel
+      const results = await Promise.allSettled(
+        clauses.map(async (clause) => {
+          const response = await fetch(`/api/clauses/${clause.id}/projection`);
+          if (response.ok) {
+            const data = await response.json();
+            return { clauseId: clause.id, projection: data.projection };
+          }
+          return null;
+        })
+      );
+
+      // Process results
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value?.projection) {
+          const { clauseId, projection } = result.value;
+          projections[clauseId] = {
+            resolvedCount: projection.resolvedCount || 0,
+            totalFindingCount: projection.totalFindingCount || 0,
+            effectiveStatus: projection.effectiveStatus || 'PENDING'
+          };
+        }
+      });
+
+      setClauseProjections(projections);
+    };
+
+    fetchAllProjections();
+  }, [contract?.analysis?.clauses, historyRefreshKey]);
+
   // T031: Fetch projection when clause is selected (Feature 006)
   useEffect(() => {
     const fetchProjection = async () => {
@@ -160,10 +215,30 @@ export default function ContractDetailPage() {
       }
 
       try {
+        console.log('[DEBUG] Fetching projection for clause:', selectedClauseId, 'historyRefreshKey:', historyRefreshKey);
         const response = await fetch(`/api/clauses/${selectedClauseId}/projection`);
         if (response.ok) {
           const data = await response.json();
+          console.log('[DEBUG] Projection fetched:', {
+            clauseId: selectedClauseId,
+            effectiveText: data.projection?.effectiveText?.substring(0, 100) + '...',
+            effectiveStatus: data.projection?.effectiveStatus,
+            decisionCount: data.projection?.decisionCount,
+            cached: data.cached
+          });
           setProjection(data.projection);
+          
+          // T011: Update clause projections map for resolution progress
+          if (data.projection) {
+            setClauseProjections(prev => ({
+              ...prev,
+              [selectedClauseId]: {
+                resolvedCount: data.projection.resolvedCount || 0,
+                totalFindingCount: data.projection.totalFindingCount || 0,
+                effectiveStatus: data.projection.effectiveStatus || 'PENDING'
+              }
+            }));
+          }
         } else {
           console.error('Failed to fetch projection');
           setProjection(null);
@@ -176,6 +251,11 @@ export default function ContractDetailPage() {
 
     fetchProjection();
   }, [selectedClauseId, historyRefreshKey]);
+
+  // Reset edit mode when switching clauses
+  useEffect(() => {
+    setIsEditMode(false);
+  }, [selectedClauseId]);
 
   async function cancelAnalysis() {
     try {
@@ -287,7 +367,7 @@ export default function ContractDetailPage() {
         return;
       }
 
-      toast.success("Triage finalized — all decisions are now locked.");
+      toast.success("Analysis finalized — all decisions are now locked.");
       await loadContract();
       setTimelineRefreshKey((k) => k + 1);
     } catch {
@@ -317,11 +397,17 @@ export default function ContractDetailPage() {
   const selectedClause =
     analysis?.clauses.find((c) => c.id === selectedClauseId) ?? null;
 
-  // Triage progress
+  // Resolution progress (Feature 007: Per-finding decisions)
   const allFindings = analysis?.clauses.flatMap((c) => c.findings) ?? [];
-  const triagedCount = allFindings.filter((f) => f.triageDecision).length;
   const totalFindings = allFindings.length;
-  const allTriaged = totalFindings > 0 && triagedCount === totalFindings;
+  
+  // Calculate total resolved findings from clause projections
+  const resolvedCount = Object.values(clauseProjections).reduce(
+    (sum, projection) => sum + projection.resolvedCount,
+    0
+  );
+  
+  const allResolved = totalFindings > 0 && resolvedCount === totalFindings;
   const isFinalized = analysis?.finalized ?? false;
 
   // Risk counts for header
@@ -419,7 +505,7 @@ export default function ContractDetailPage() {
                   yellowCount={yellowCount}
                   greenCount={greenCount}
                   clauseCount={analysis.totalClauses || analysis.clauses.length}
-                  triagedCount={triagedCount}
+                  resolvedCount={resolvedCount}
                   totalFindings={totalFindings}
                   playbookVersion={analysis.playbookVersion}
                   isFinalized={isFinalized}
@@ -446,6 +532,7 @@ export default function ContractDetailPage() {
                       selectedClauseId={selectedClauseId}
                       finalized={isFinalized}
                       onSelectClause={setSelectedClauseId}
+                      clauseProjections={clauseProjections}
                     />
                   </div>
                 </ResizablePanel>
@@ -469,6 +556,7 @@ export default function ContractDetailPage() {
                       }}
                       escalatedToUserName={projection?.escalatedToUserName}
                       hasUnresolvedEscalation={projection?.hasUnresolvedEscalation}
+                      editingFindingId={editingFindingId}
                     />
                   </div>
                 </ResizablePanel>
@@ -485,26 +573,6 @@ export default function ContractDetailPage() {
                       executiveSummary={analysis.executiveSummary}
                       negotiationItems={analysis.negotiationItems}
                       onTriageDecision={handleTriageDecision}
-                      onCommentAdded={(findingId, comment) => {
-                        setContract((prev) => {
-                          if (!prev?.analysis) return prev;
-                          return {
-                            ...prev,
-                            analysis: {
-                              ...prev.analysis,
-                              clauses: prev.analysis.clauses.map((clause) => ({
-                                ...clause,
-                                findings: clause.findings.map((f) =>
-                                  f.id === findingId
-                                    ? { ...f, comments: [...f.comments, comment] }
-                                    : f
-                                ),
-                              })),
-                            },
-                          };
-                        });
-                        setTimelineRefreshKey((k) => k + 1);
-                      }}
                       projection={projection}
                       onDecisionApplied={() => {
                         loadContract();
@@ -512,7 +580,20 @@ export default function ContractDetailPage() {
                         setTimelineRefreshKey((k) => k + 1);
                       }}
                       historyRefreshKey={historyRefreshKey}
-                      onEditManualClick={() => setIsEditMode(true)}
+                      onEditManualClick={(findingId) => {
+                        setEditingFindingId(findingId ?? null);
+                        setIsEditMode(true);
+                      }}
+                      onEscalateClick={(findingId) => {
+                        setActiveModalFindingId(findingId);
+                        setEscalateModalOpen(true);
+                      }}
+                      onNoteClick={(findingId) => {
+                        setActiveModalFindingId(findingId);
+                        setNoteInputOpen(true);
+                      }}
+                      currentUserId={session?.user?.id}
+                      currentUserRole={session?.user?.role}
                     />
                   </div>
                 </ResizablePanel>
@@ -550,7 +631,39 @@ export default function ContractDetailPage() {
         </div>
       </div>
 
-      {/* Re-analysis confirmation dialog */}
+      {/* Feature 007: Escalate Modal (finding-level) */}
+      {selectedClause && (
+        <EscalateModal
+          open={escalateModalOpen}
+          onOpenChange={setEscalateModalOpen}
+          clauseId={selectedClause.id}
+          clauseName={selectedClause.clauseName}
+          findingId={activeModalFindingId ?? undefined}
+          onEscalated={() => {
+            loadContract();
+            setHistoryRefreshKey((k) => k + 1);
+            setTimelineRefreshKey((k) => k + 1);
+            setActiveModalFindingId(null);
+          }}
+        />
+      )}
+
+      {/* Feature 007: Note Input (finding-level) */}
+      {selectedClause && (
+        <NoteInput
+          open={noteInputOpen}
+          onOpenChange={setNoteInputOpen}
+          clauseId={selectedClause.id}
+          clauseName={selectedClause.clauseName}
+          findingId={activeModalFindingId ?? undefined}
+          onNoteSaved={() => {
+            loadContract();
+            setHistoryRefreshKey((k) => k + 1);
+            setTimelineRefreshKey((k) => k + 1);
+            setActiveModalFindingId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,53 +1,35 @@
 /**
  * API Route: Clause Decisions
- * Feature 006: Clause Decision Actions & Undo System
- * 
- * POST /api/clauses/[id]/decisions - Apply a decision action to a clause
- * GET /api/clauses/[id]/decisions - Get decision history for a clause
+ * Feature 007: Per-Finding Decision Actions
+ *
+ * POST /api/clauses/[id]/decisions - Apply a finding-level decision action
+ * GET /api/clauses/[id]/decisions - Get decision history (includes legacy + finding-level)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { 
-  ApplyDecisionRequest, 
+import {
+  ApplyDecisionRequest,
   ApplyDecisionResponse,
   DecisionActionType,
   ClauseDecisionPayload,
 } from '@/types/decisions';
-import { canMakeDecisionOnClause } from '@/lib/permissions';
+import { canMakeDecisionOnFinding } from '@/lib/permissions';
 import { computeProjection } from '@/lib/projection';
 import { invalidateCachedProjection } from '@/lib/cache';
 
 /**
  * POST /api/clauses/[id]/decisions
- * 
- * Apply a decision action to a clause (e.g., accept, replace, edit, escalate, undo, revert).
- * 
- * Authentication: Required (user must be logged in)
- * Authorization: User must have REVIEW_CONTRACTS permission (checked in implementation)
- * 
- * Request Body:
- * {
- *   actionType: DecisionActionType,
- *   payload: ClauseDecisionPayload,
- *   clauseUpdatedAtWhenLoaded?: string  // For conflict detection
- * }
- * 
- * Response:
- * {
- *   success: boolean,
- *   decision: ClauseDecision,
- *   projection: ProjectionResult,
- *   conflictWarning?: { message: string, lastUpdatedAt: string, lastUpdatedBy: string }
- * }
+ *
+ * Apply a finding-level decision action.
+ * Requires findingId for all new decisions (Feature 007).
  */
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authentication check
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -59,9 +41,16 @@ export async function POST(
     const { id: clauseId } = await context.params;
     const userId = session.user.id;
 
-    // Parse request body
     const body: ApplyDecisionRequest = await request.json();
-    const { actionType, payload, clauseUpdatedAtWhenLoaded } = body;
+    const { actionType, payload, clauseUpdatedAtWhenLoaded, findingId } = body;
+
+    // Validate findingId is present (Feature 007: required for all decisions)
+    if (!findingId) {
+      return NextResponse.json(
+        { error: 'findingId is required for all decisions' },
+        { status: 400 }
+      );
+    }
 
     // Validate actionType
     const validActionTypes = Object.values(DecisionActionType);
@@ -72,7 +61,27 @@ export async function POST(
       );
     }
 
-    // T032: Validate payload for specific action types
+    // Validate finding exists and belongs to this clause
+    const finding = await db.analysisFinding.findUnique({
+      where: { id: findingId },
+      select: { id: true, clauseId: true },
+    });
+
+    if (!finding) {
+      return NextResponse.json(
+        { error: 'Finding not found' },
+        { status: 404 }
+      );
+    }
+
+    if (finding.clauseId !== clauseId) {
+      return NextResponse.json(
+        { error: 'Finding does not belong to this clause' },
+        { status: 400 }
+      );
+    }
+
+    // Validate payload for specific action types
     if (actionType === DecisionActionType.APPLY_FALLBACK) {
       const fallbackPayload = payload as any;
       if (!fallbackPayload.replacementText || !fallbackPayload.source || !fallbackPayload.playbookRuleId) {
@@ -97,28 +106,23 @@ export async function POST(
           { status: 400 }
         );
       }
-      
-      // T052: Validate assigneeId has APPROVE_ESCALATIONS permission
+
       const assignee = await db.user.findUnique({
         where: { id: escalatePayload.assigneeId },
         select: { id: true, role: true },
       });
-      
+
       if (!assignee) {
         return NextResponse.json(
           { error: 'Assignee user not found' },
           { status: 400 }
         );
       }
-      
-      // Check if assignee has APPROVE_ESCALATIONS permission
+
       const hasApprovalPermission = await db.rolePermission.findFirst({
-        where: {
-          role: assignee.role,
-          permission: 'APPROVE_ESCALATIONS',
-        },
+        where: { role: assignee.role, permission: 'APPROVE_ESCALATIONS' },
       });
-      
+
       if (!hasApprovalPermission && assignee.role !== 'admin') {
         return NextResponse.json(
           { error: 'Assignee does not have approval permissions' },
@@ -141,16 +145,32 @@ export async function POST(
           { status: 400 }
         );
       }
-    }
-    // T061: REVERT has empty payload - no validation needed
 
-    // Fetch clause to check existence and get current state
+      // Validate undoneDecisionId references a decision with the same findingId
+      const targetDecision = await db.clauseDecision.findUnique({
+        where: { id: undoPayload.undoneDecisionId },
+        select: { findingId: true },
+      });
+
+      if (!targetDecision) {
+        return NextResponse.json(
+          { error: 'Target decision for undo not found' },
+          { status: 400 }
+        );
+      }
+
+      if (targetDecision.findingId !== findingId) {
+        return NextResponse.json(
+          { error: 'Cannot undo a decision from a different finding' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Fetch clause for conflict detection
     const clause = await db.analysisClause.findUnique({
       where: { id: clauseId },
-      select: {
-        id: true,
-        updatedAt: true,
-      },
+      select: { id: true, updatedAt: true },
     });
 
     if (!clause) {
@@ -160,74 +180,70 @@ export async function POST(
       );
     }
 
-    // Compute current projection for permission check
+    // Permission check: finding-level escalation lock
     const currentProjection = await computeProjection(clauseId);
-
-    // Check permissions
-    const canMakeDecision = await canMakeDecisionOnClause(
+    const canMakeDecision = await canMakeDecisionOnFinding(
       userId,
       clauseId,
-      currentProjection.effectiveStatus,
-      currentProjection.escalatedToUserId
+      findingId,
+      currentProjection.findingStatuses
     );
 
     if (!canMakeDecision) {
       return NextResponse.json(
-        { error: 'Forbidden - You do not have permission to make decisions on this clause' },
+        { error: 'Forbidden - You do not have permission to make decisions on this finding' },
         { status: 403 }
       );
     }
 
-    // Conflict detection (optimistic locking)
+    // Conflict detection
     let conflictWarning = undefined;
     if (clauseUpdatedAtWhenLoaded) {
       const loadedAt = new Date(clauseUpdatedAtWhenLoaded);
       if (clause.updatedAt > loadedAt) {
-        // Clause was modified after user loaded it - warn but allow
         conflictWarning = {
           message: 'This clause was modified by another user since you loaded it. Your change has been applied, but you may want to review.',
           lastUpdatedAt: clause.updatedAt.toISOString(),
-          lastUpdatedBy: 'Unknown', // Can be enhanced to track last modifier
+          lastUpdatedBy: 'Unknown',
         };
       }
     }
 
-    // Create ClauseDecision record
+    // Create ClauseDecision with findingId
     const decision = await db.clauseDecision.create({
       data: {
-        clauseId,
-        userId,
+        clause: { connect: { id: clauseId } },
+        user: { connect: { id: userId } },
+        finding: { connect: { id: findingId } },
         actionType,
         payload: JSON.stringify(payload),
       },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
+        },
+        finding: {
+          select: { id: true, riskLevel: true, matchedRuleTitle: true },
         },
       },
     });
 
-    // Invalidate projection cache
+    // Invalidate cache and recompute
     invalidateCachedProjection(clauseId);
-
-    // Compute new projection
     const newProjection = await computeProjection(clauseId);
 
-    // Build response
     const response: ApplyDecisionResponse = {
       success: true,
       decision: {
         id: decision.id,
         clauseId: decision.clauseId,
+        findingId: decision.findingId,
         userId: decision.userId,
         actionType: decision.actionType as DecisionActionType,
         timestamp: decision.timestamp,
         payload: JSON.parse(decision.payload) as ClauseDecisionPayload,
         user: decision.user,
+        finding: decision.finding,
       },
       projection: newProjection,
       conflictWarning,
@@ -235,13 +251,10 @@ export async function POST(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    // T078: Enhanced database error handling
     console.error('[POST /api/clauses/[id]/decisions] Error:', error);
-    
-    // Check for Prisma-specific errors
+
     if (error && typeof error === 'object' && 'code' in error) {
-      const prismaError = error as { code: string; meta?: any };
-      
+      const prismaError = error as { code: string };
       if (prismaError.code === 'P2002') {
         return NextResponse.json(
           { error: 'Duplicate decision detected. Please refresh and try again.' },
@@ -249,12 +262,12 @@ export async function POST(
         );
       } else if (prismaError.code === 'P2025') {
         return NextResponse.json(
-          { error: 'Clause not found. It may have been deleted.' },
+          { error: 'Clause or finding not found. It may have been deleted.' },
           { status: 404 }
         );
       }
     }
-    
+
     return NextResponse.json(
       { error: 'Internal server error. Please try again or contact support.' },
       { status: 500 }
@@ -264,25 +277,15 @@ export async function POST(
 
 /**
  * GET /api/clauses/[id]/decisions
- * 
+ *
  * Get decision history for a clause (chronological order).
- * 
- * Authentication: Required (user must be logged in)
- * Authorization: User must have REVIEW_CONTRACTS permission
- * 
- * Query Parameters: None (future: actionType, userId, date filters)
- * 
- * Response:
- * {
- *   decisions: ClauseDecision[]
- * }
+ * Includes finding info and legacy indicator.
  */
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authentication check
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(
@@ -294,10 +297,9 @@ export async function GET(
     const { id: clauseId } = await context.params;
     const userId = session.user.id;
 
-    // Check permissions
     const { canAccessContractReview } = await import('@/lib/permissions');
     const canAccess = await canAccessContractReview(userId);
-    
+
     if (!canAccess) {
       return NextResponse.json(
         { error: 'Forbidden - You do not have permission to access contract review features' },
@@ -305,37 +307,36 @@ export async function GET(
       );
     }
 
-    // Fetch decision history
     const rawDecisions = await db.clauseDecision.findMany({
       where: { clauseId },
       orderBy: { timestamp: 'asc' },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
+        },
+        finding: {
+          select: { id: true, riskLevel: true, matchedRuleTitle: true },
         },
       },
     });
 
-    // Parse payloads
-    const decisions = rawDecisions.map((d) => ({
+    const decisions = rawDecisions.map(d => ({
       id: d.id,
       clauseId: d.clauseId,
+      findingId: d.findingId,
       userId: d.userId,
       actionType: d.actionType as DecisionActionType,
       timestamp: d.timestamp,
       payload: JSON.parse(d.payload) as ClauseDecisionPayload,
       user: d.user,
+      finding: d.finding ?? null,
+      isLegacy: d.findingId === null,
     }));
 
     return NextResponse.json({ decisions }, { status: 200 });
   } catch (error) {
-    // T078: Enhanced database error handling
     console.error('[GET /api/clauses/[id]/decisions] Error:', error);
-    
+
     return NextResponse.json(
       { error: 'Failed to retrieve decision history. Please try again or contact support.' },
       { status: 500 }

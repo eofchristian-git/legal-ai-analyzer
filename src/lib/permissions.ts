@@ -7,7 +7,7 @@
  */
 
 import { db } from '@/lib/db';
-import { Permission, ClauseStatus } from '@/types/decisions';
+import { Permission, ClauseStatus, FindingStatusEntry, FindingStatusValue } from '@/types/decisions';
 
 // ============================================================================
 // Permission Checking Functions
@@ -121,6 +121,47 @@ export async function canMakeDecisionOnClause(
   }
 
   // For non-escalated clauses, REVIEW_CONTRACTS permission is sufficient
+  return true;
+}
+
+/**
+ * Check if a user can make a decision on a specific finding.
+ *
+ * Feature 007: Finding-level escalation lock. Only the escalated finding
+ * is locked — other findings remain actionable.
+ *
+ * Rules:
+ * 1. User must have REVIEW_CONTRACTS permission
+ * 2. If THIS finding is ESCALATED:
+ *    - Only the assigned approver (with APPROVE_ESCALATIONS) or admin can decide
+ * 3. Other findings are unaffected by this finding's escalation
+ */
+export async function canMakeDecisionOnFinding(
+  userId: string,
+  clauseId: string,
+  findingId: string,
+  findingStatuses: Record<string, FindingStatusEntry>
+): Promise<boolean> {
+  const canReview = await canAccessContractReview(userId);
+  if (!canReview) return false;
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!user) return false;
+
+  // Admin bypass
+  if (user.role === 'admin') return true;
+
+  // Check if THIS finding is escalated
+  const findingStatus = findingStatuses[findingId];
+  if (findingStatus?.status === FindingStatusValue.ESCALATED) {
+    // Only the assigned approver can make decisions on this finding
+    if (findingStatus.escalatedTo !== userId) return false;
+    return hasPermission(userId, 'APPROVE_ESCALATIONS');
+  }
+
   return true;
 }
 

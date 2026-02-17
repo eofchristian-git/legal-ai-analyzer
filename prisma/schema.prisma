@@ -254,17 +254,20 @@ model RolePermission {
 // Note: SQLite doesn't support enums, so actionType is String with validation in app code
 // Valid actionTypes: "ACCEPT_DEVIATION" | "APPLY_FALLBACK" | "EDIT_MANUAL" | "ESCALATE" | "ADD_NOTE" | "UNDO" | "REVERT"
 model ClauseDecision {
-  id         String         @id @default(cuid())
+  id         String           @id @default(cuid())
   clauseId   String
-  clause     AnalysisClause @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  clause     AnalysisClause   @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  findingId  String?          // Required for new decisions; null only for legacy clause-level records (Feature 006)
+  finding    AnalysisFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
   userId     String
-  user       User           @relation("ClauseDecisions", fields: [userId], references: [id])
+  user       User             @relation("ClauseDecisions", fields: [userId], references: [id])
   actionType String                              // "ACCEPT_DEVIATION" | "APPLY_FALLBACK" | "EDIT_MANUAL" | "ESCALATE" | "ADD_NOTE" | "UNDO" | "REVERT"
-  timestamp  DateTime       @default(now())
+  timestamp  DateTime         @default(now())
   payload    String                              // JSON string with action-specific data
 
-  @@index([clauseId, timestamp])  // For chronological replay in projection
-  @@index([clauseId])             // For cache invalidation queries
+  @@index([clauseId, timestamp])              // For chronological replay in projection
+  @@index([clauseId, findingId, timestamp])   // For finding-level projection queries
+  @@index([clauseId])                         // For cache invalidation queries
 }
 
 model AnalysisFinding {
@@ -291,7 +294,8 @@ model AnalysisFinding {
   locationPage     Int?           // Approximate page number in document
   locationPosition String?        // Approximate position: "top" | "middle" | "bottom"
 
-  comments FindingComment[]
+  comments  FindingComment[]
+  decisions ClauseDecision[]  // NEW: Reverse relation for finding-level decisions (Feature 007)
 }
 
 model FindingComment {

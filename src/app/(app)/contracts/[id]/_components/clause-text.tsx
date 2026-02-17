@@ -15,13 +15,13 @@ import {
 import { FileText, Highlighter, BookOpen, MapPin, Save, X, AlertTriangle } from "lucide-react";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding } from "./types";
-import { ClauseStatus, TrackedChange } from "@/types/decisions";
+import { ClauseStatus, DerivedClauseStatus, TrackedChange } from "@/types/decisions";
 import { TrackedChangesDisplay } from "./tracked-changes";
 import { toast } from "sonner";
 
 interface ClauseTextProps {
   clause: Clause | null;
-  effectiveStatus?: ClauseStatus | null;  // NEW: Feature 006 - Clause status from projection
+  effectiveStatus?: ClauseStatus | DerivedClauseStatus | null;  // Feature 006/007 - Clause status from projection
   trackedChanges?: TrackedChange[];       // NEW: Feature 006 - Tracked changes for text modifications
   isEditMode?: boolean;                    // T048: Feature 006 - Enable inline editing
   effectiveText?: string | null;          // T048: The current effective text for editing
@@ -29,6 +29,7 @@ interface ClauseTextProps {
   onDecisionApplied?: () => void;         // T048: Callback after save
   escalatedToUserName?: string | null;    // T059: Show assignee name for escalated clauses
   hasUnresolvedEscalation?: boolean;      // T060: Show locked state
+  editingFindingId?: string | null;       // T020c: Feature 007 - Finding ID for manual edits
 }
 
 const riskLabel: Record<string, string> = {
@@ -49,6 +50,7 @@ export function ClauseText({
   onDecisionApplied,
   escalatedToUserName,
   hasUnresolvedEscalation,
+  editingFindingId,
 }: ClauseTextProps) {
   // Detect format: v1 has clauseText, v2 has empty clauseText with context fields
   const isLegacyFormat = !!clause?.clauseText && clause.clauseText.length > 0;
@@ -82,9 +84,15 @@ export function ClauseText({
   }, [isEditMode, clause, effectiveText]);
   
   // T050: Handle save edit
+  // T020c: Pass findingId for manual edits (Feature 007)
   const handleSaveEdit = async () => {
     if (!clause || !editedText.trim()) {
       toast.error("Please enter some text");
+      return;
+    }
+    
+    if (!editingFindingId) {
+      toast.error("No finding selected for editing");
       return;
     }
     
@@ -95,6 +103,7 @@ export function ClauseText({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actionType: 'EDIT_MANUAL',
+          findingId: editingFindingId,  // T020c: Feature 007 - Required for all decisions
           payload: {
             replacementText: editedText.trim(),
           },
@@ -166,22 +175,22 @@ export function ClauseText({
             </Badge>
             <h2 className="text-sm font-semibold text-foreground">{clause.clauseName}</h2>
             
-            {/* T027: Effective Status Badge (Feature 006) */}
-            {effectiveStatus && effectiveStatus !== 'DEVIATION_DETECTED' && effectiveStatus !== 'NO_DEVIATION' && (
+            {/* T024: Effective Status Badge (Feature 007 - DerivedClauseStatus) */}
+            {effectiveStatus && effectiveStatus !== 'DEVIATION_DETECTED' && effectiveStatus !== 'NO_DEVIATION' && effectiveStatus !== 'PENDING' && (
               <Badge 
                 variant="secondary"
                 className={cn(
                   "text-xs shrink-0",
-                  effectiveStatus === 'ACCEPTED' && "bg-green-100 text-green-800 border-green-300",
-                  effectiveStatus === 'RESOLVED_APPLIED_FALLBACK' && "bg-blue-100 text-blue-800 border-blue-300",
-                  effectiveStatus === 'RESOLVED_MANUAL_EDIT' && "bg-purple-100 text-purple-800 border-purple-300",
-                  effectiveStatus === 'ESCALATED' && "bg-yellow-100 text-yellow-800 border-yellow-300"
+                  effectiveStatus === 'RESOLVED' && "bg-green-100 text-green-800 border-green-300",
+                  effectiveStatus === 'PARTIALLY_RESOLVED' && "bg-blue-100 text-blue-800 border-blue-300",
+                  effectiveStatus === 'ESCALATED' && "bg-yellow-100 text-yellow-800 border-yellow-300",
+                  effectiveStatus === 'NO_ISSUES' && "bg-green-100 text-green-800 border-green-300"
                 )}
               >
-                {effectiveStatus === 'ACCEPTED' && '✓ Accepted'}
-                {effectiveStatus === 'RESOLVED_APPLIED_FALLBACK' && 'Applied Fallback'}
-                {effectiveStatus === 'RESOLVED_MANUAL_EDIT' && 'Manually Edited'}
+                {effectiveStatus === 'RESOLVED' && '✓ Resolved'}
+                {effectiveStatus === 'PARTIALLY_RESOLVED' && 'Partially Resolved'}
                 {effectiveStatus === 'ESCALATED' && 'Escalated'}
+                {effectiveStatus === 'NO_ISSUES' && 'No Issues'}
               </Badge>
             )}
             
@@ -189,13 +198,6 @@ export function ClauseText({
             {effectiveStatus === 'ESCALATED' && escalatedToUserName && (
               <span className="text-xs text-muted-foreground italic">
                 (awaiting {escalatedToUserName})
-              </span>
-            )}
-            
-            {/* T027: "Accepted deviation (playbook override)" tag */}
-            {effectiveStatus === 'ACCEPTED' && (
-              <span className="text-xs text-muted-foreground italic">
-                (playbook override)
               </span>
             )}
           </div>

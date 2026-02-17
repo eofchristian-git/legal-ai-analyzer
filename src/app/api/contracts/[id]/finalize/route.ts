@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionOrUnauthorized } from "@/lib/auth-utils";
+import { computeProjection } from "@/lib/projection";
+import { FindingStatusValue } from "@/types/decisions";
 
 export async function POST(
   _req: NextRequest,
@@ -42,14 +44,47 @@ export async function POST(
       );
     }
 
-    // Check that all findings have a triage decision
-    const allFindings = contract.analysis.clauses.flatMap((c: any) => c.findings);
-    const pendingFindings = allFindings.filter((f: any) => !f.triageDecision);
+    // Check that all findings have been resolved using the projection system (Feature 007)
+    const allClauses = contract.analysis.clauses;
+    let totalFindings = 0;
+    let resolvedFindings = 0;
+    const unresolvedFindings: string[] = [];
 
-    if (pendingFindings.length > 0) {
+    for (const clause of allClauses) {
+      const findings = clause.findings;
+      if (findings.length === 0) continue;
+
+      // Compute projection to get finding statuses
+      const projection = await computeProjection(clause.id);
+      
+      for (const finding of findings) {
+        totalFindings++;
+        const findingStatus = projection.findingStatuses[finding.id];
+        
+        if (findingStatus) {
+          // Check if finding is resolved
+          const isResolved = 
+            findingStatus.status === FindingStatusValue.ACCEPTED ||
+            findingStatus.status === FindingStatusValue.RESOLVED_APPLIED_FALLBACK ||
+            findingStatus.status === FindingStatusValue.RESOLVED_MANUAL_EDIT;
+          
+          if (isResolved) {
+            resolvedFindings++;
+          } else {
+            unresolvedFindings.push(`${clause.clauseNumber}: ${finding.matchedRuleTitle}`);
+          }
+        } else {
+          // No status = pending
+          unresolvedFindings.push(`${clause.clauseNumber}: ${finding.matchedRuleTitle}`);
+        }
+      }
+    }
+
+    if (unresolvedFindings.length > 0) {
       return NextResponse.json(
         {
-          error: `Cannot finalize: ${pendingFindings.length} finding(s) still have no triage decision. All findings must be triaged before finalizing.`,
+          error: `Cannot finalize: ${unresolvedFindings.length} finding(s) still unresolved. All findings must be resolved before finalizing.`,
+          unresolvedFindings: unresolvedFindings.slice(0, 10), // Show first 10
         },
         { status: 400 }
       );
@@ -75,7 +110,8 @@ export async function POST(
         targetType: "analysis",
         targetId: contract.analysis.id,
         metadata: JSON.stringify({
-          totalFindings: allFindings.length,
+          totalFindings,
+          resolvedFindings,
         }),
       },
     });
@@ -83,14 +119,14 @@ export async function POST(
     return NextResponse.json({
       finalized: true,
       finalizedAt: now.toISOString(),
-      totalFindings: allFindings.length,
-      triaged: allFindings.length,
+      totalFindings,
+      resolvedFindings,
       pending: 0,
     });
   } catch (error) {
-    console.error("Failed to finalize triage:", error);
+    console.error("Failed to finalize analysis:", error);
     return NextResponse.json(
-      { error: "Failed to finalize triage" },
+      { error: "Failed to finalize analysis" },
       { status: 500 }
     );
   }

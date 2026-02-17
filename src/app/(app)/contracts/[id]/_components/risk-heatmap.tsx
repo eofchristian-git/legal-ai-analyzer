@@ -11,7 +11,7 @@ interface RiskHeatmapProps {
   yellowCount: number;
   greenCount: number;
   clauseCount: number;
-  triagedCount: number;
+  resolvedCount: number;
   totalFindings: number;
   playbookVersion: number | null;
   isFinalized: boolean;
@@ -40,15 +40,15 @@ export function RiskHeatmap({
   yellowCount,
   greenCount,
   clauseCount,
-  triagedCount,
+  resolvedCount,
   totalFindings,
   playbookVersion,
   isFinalized,
   finalizing,
   onFinalize,
 }: RiskHeatmapProps) {
-  const triagePct = totalFindings ? (triagedCount / totalFindings) * 100 : 0;
-  const allTriaged = totalFindings > 0 && triagedCount === totalFindings;
+  const resolutionPct = totalFindings ? (resolvedCount / totalFindings) * 100 : 0;
+  const allResolved = totalFindings > 0 && resolvedCount === totalFindings;
   const risk = riskConfig[overallRisk.toLowerCase()] ?? riskConfig.medium;
 
   return (
@@ -79,34 +79,34 @@ export function RiskHeatmap({
         </Badge>
       )}
 
-      {/* Triage progress */}
+      {/* Resolution progress */}
       <div className="ml-auto flex items-center gap-4">
         <div className="flex items-center gap-2.5">
-          <span className="text-xs text-muted-foreground">Triage</span>
+          <span className="text-xs text-muted-foreground">Resolved</span>
           <div className="flex items-center gap-2">
             <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  allTriaged ? "bg-emerald-500" : "bg-foreground/30"
+                  allResolved ? "bg-emerald-500" : "bg-foreground/30"
                 )}
-                style={{ width: `${triagePct}%` }}
+                style={{ width: `${resolutionPct}%` }}
               />
             </div>
             <span className={cn(
               "text-xs font-medium tabular-nums",
-              allTriaged ? "text-emerald-600" : "text-muted-foreground"
+              allResolved ? "text-emerald-600" : "text-muted-foreground"
             )}>
-              {triagedCount}/{totalFindings}
+              {resolvedCount}/{totalFindings}
             </span>
           </div>
         </div>
 
         <Button
           size="sm"
-          variant={allTriaged && !isFinalized ? "default" : "outline"}
+          variant={allResolved && !isFinalized ? "default" : "outline"}
           className="gap-1.5 h-7 text-xs"
-          disabled={isFinalized || !allTriaged || finalizing}
+          disabled={isFinalized || !allResolved || finalizing}
           onClick={onFinalize}
         >
           <Lock className="h-3 w-3" />

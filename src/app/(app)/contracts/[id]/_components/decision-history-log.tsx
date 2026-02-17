@@ -3,14 +3,22 @@
 /**
  * Decision History Log Component
  * Feature 006: Clause Decision Actions & Undo System
+ * Feature 007 T022: Enhanced with finding-level filtering, badges, and legacy labels
  * 
  * Displays chronological decision history for a clause with visual indicators
  * for undone decisions and action types.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   CheckCircle, 
   RefreshCw, 
@@ -21,6 +29,7 @@ import {
   RotateCcw,
   Clock,
   User,
+  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ClauseDecision } from '@/types/decisions';
@@ -37,6 +46,8 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
   const [decisions, setDecisions] = useState<ClauseDecision[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // T022: Finding-level filter state
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
 
   // Fetch decision history
   useEffect(() => {
@@ -76,6 +87,31 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
     }
   }
 
+  // T022: Extract unique findings from decisions
+  const uniqueFindings = useMemo(() => {
+    const findingMap = new Map<string, { id: string; title: string; riskLevel: string }>();
+    for (const decision of decisions) {
+      if (decision.findingId && decision.finding) {
+        if (!findingMap.has(decision.findingId)) {
+          findingMap.set(decision.findingId, {
+            id: decision.findingId,
+            title: decision.finding.matchedRuleTitle || 'Unknown finding',
+            riskLevel: decision.finding.riskLevel || 'GREEN',
+          });
+        }
+      }
+    }
+    return Array.from(findingMap.values());
+  }, [decisions]);
+
+  // T022: Filter decisions by selected finding
+  const filteredDecisions = useMemo(() => {
+    if (!selectedFindingId) {
+      return decisions;
+    }
+    return decisions.filter((d) => d.findingId === selectedFindingId);
+  }, [decisions, selectedFindingId]);
+
   if (loading) {
     return (
       <div className="p-4 text-center text-sm text-muted-foreground">
@@ -101,16 +137,67 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
   }
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4 space-y-3">
-        {decisions.map((decision, index) => {
-          const isUndone = undoneDecisionIds.has(decision.id);
-          const isUndo = decision.actionType === 'UNDO';
-          const isRevert = decision.actionType === 'REVERT';
+    <div className="flex flex-col h-full">
+      {/* T022: Finding filter dropdown */}
+      {uniqueFindings.length > 0 && (
+        <div className="p-3 pb-2 border-b">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 text-xs">
+                <Filter className="h-3 w-3 mr-1.5" />
+                {selectedFindingId
+                  ? uniqueFindings.find((f) => f.id === selectedFindingId)?.title || 'Unknown'
+                  : 'All decisions'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-w-[300px]">
+              <DropdownMenuItem onClick={() => setSelectedFindingId(null)}>
+                All decisions ({decisions.length})
+              </DropdownMenuItem>
+              {uniqueFindings.map((finding) => (
+                <DropdownMenuItem
+                  key={finding.id}
+                  onClick={() => setSelectedFindingId(finding.id)}
+                  className="text-xs"
+                >
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'mr-2 text-[10px] px-1.5 py-0',
+                      finding.riskLevel === 'RED'
+                        ? 'bg-risk-red-soft text-risk-red border-risk-red-border'
+                        : finding.riskLevel === 'YELLOW'
+                        ? 'bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border'
+                        : 'bg-risk-green-soft text-risk-green border-risk-green-border'
+                    )}
+                  >
+                    {finding.riskLevel}
+                  </Badge>
+                  <span className="truncate">{finding.title}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+      
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-3">
+          {filteredDecisions.length === 0 && (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              No decisions for this finding
+            </div>
+          )}
+          
+          {filteredDecisions.map((decision, index) => {
+            const isUndone = undoneDecisionIds.has(decision.id);
+            const isUndo = decision.actionType === 'UNDO';
+            const isRevert = decision.actionType === 'REVERT';
+            const isLegacy = !decision.findingId;
 
-          return (
-            <div
-              key={decision.id}
+            return (
+              <div
+                key={decision.id}
               className={cn(
                 'relative pl-8 pb-3 border-l-2',
                 isUndone ? 'border-gray-300 opacity-50' : 'border-primary',
@@ -130,7 +217,7 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
               {/* Decision content */}
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {getActionIcon(decision.actionType)}
                     <span
                       className={cn(
@@ -143,6 +230,28 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
                     {isUndone && (
                       <Badge variant="outline" className="text-xs">
                         UNDONE
+                      </Badge>
+                    )}
+                    {/* T022: Finding badge */}
+                    {decision.findingId && decision.finding && (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'text-[10px] px-1.5 py-0',
+                          decision.finding.riskLevel === 'RED'
+                            ? 'bg-risk-red-soft text-risk-red border-risk-red-border'
+                            : decision.finding.riskLevel === 'YELLOW'
+                            ? 'bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border'
+                            : 'bg-risk-green-soft text-risk-green border-risk-green-border'
+                        )}
+                      >
+                        {decision.finding.matchedRuleTitle}
+                      </Badge>
+                    )}
+                    {/* T022: Legacy label */}
+                    {isLegacy && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        Legacy (clause-level)
                       </Badge>
                     )}
                   </div>
@@ -166,8 +275,9 @@ export function DecisionHistoryLog({ clauseId, refreshTrigger }: DecisionHistory
             </div>
           );
         })}
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
