@@ -178,6 +178,8 @@ export function DecisionButtons({
 
   /**
    * T042: Handle Undo action - Undo the last decision
+   * 
+   * Fixed: Now correctly identifies the last "active" (non-undone) decision
    */
   const handleUndo = async () => {
     try {
@@ -192,10 +194,26 @@ export function DecisionButtons({
       const historyData = await historyResponse.json();
       const decisions = historyData.decisions || [];
 
-      // Find the last non-UNDO decision
-      const lastDecision = decisions
-        .filter((d: any) => d.actionType !== 'UNDO' && d.actionType !== 'REVERT')
-        .pop();
+      // Build set of already-undone decision IDs
+      const undoneDecisionIds = new Set<string>();
+      for (const decision of decisions) {
+        if (decision.actionType === 'UNDO') {
+          const payload = decision.payload as any;
+          if (payload.undoneDecisionId) {
+            undoneDecisionIds.add(payload.undoneDecisionId);
+          }
+        }
+      }
+
+      // Find the last active (non-undone, non-UNDO, non-REVERT) decision
+      const activeDecisions = decisions.filter(
+        (d: any) => 
+          d.actionType !== 'UNDO' && 
+          d.actionType !== 'REVERT' && 
+          !undoneDecisionIds.has(d.id)
+      );
+
+      const lastDecision = activeDecisions[activeDecisions.length - 1];
 
       if (!lastDecision) {
         toast.error('No decision to undo');
@@ -220,9 +238,18 @@ export function DecisionButtons({
         throw new Error(error.error || 'Failed to undo decision');
       }
 
+      const data = await response.json();
+      console.log('[DEBUG Undo] Undo successful:', {
+        undoneAction: lastDecision.actionType,
+        newProjection: data.projection,
+        effectiveText: data.projection?.effectiveText?.substring(0, 100) + '...',
+        decisionCount: data.projection?.decisionCount
+      });
+
       toast.success(`Undone: ${formatActionType(lastDecision.actionType)}`);
 
       // Trigger parent refresh
+      console.log('[DEBUG Undo] Calling onDecisionApplied to refresh UI');
       onDecisionApplied?.();
     } catch (error) {
       console.error('Error undoing decision:', error);
@@ -313,6 +340,7 @@ export function DecisionButtons({
         disabled={isButtonsDisabled}
         variant="outline"
         size="sm"
+        aria-label="Accept the deviation found in this clause"
       >
         <CheckCircle className="mr-2 h-4 w-4" />
         Accept deviation
@@ -324,6 +352,7 @@ export function DecisionButtons({
         variant="outline"
         size="sm"
         title={!hasFallbackLanguage ? 'No fallback language available' : 'Replace with playbook fallback language'}
+        aria-label="Replace clause text with fallback language from playbook"
       >
         <RefreshCw className="mr-2 h-4 w-4" />
         Replace with fallback
@@ -334,6 +363,7 @@ export function DecisionButtons({
         disabled={isButtonsDisabled}
         variant="outline"
         size="sm"
+        aria-label="Manually edit clause text"
       >
         <Edit className="mr-2 h-4 w-4" />
         Edit manually
@@ -344,6 +374,7 @@ export function DecisionButtons({
         disabled={isButtonsDisabled}
         variant="outline"
         size="sm"
+        aria-label="Escalate this clause to an approver for review"
       >
         <AlertTriangle className="mr-2 h-4 w-4" />
         Escalate
@@ -354,6 +385,7 @@ export function DecisionButtons({
         disabled={isLoading}
         variant="outline"
         size="sm"
+        aria-label="Add an internal note to this clause"
       >
         <MessageSquare className="mr-2 h-4 w-4" />
         Add note
@@ -367,6 +399,7 @@ export function DecisionButtons({
         disabled={isLoading || (projection?.decisionCount ?? 0) === 0}
         variant="ghost"
         size="sm"
+        aria-label="Undo the last decision made on this clause"
       >
         <Undo2 className="mr-2 h-4 w-4" />
         Undo
@@ -377,6 +410,7 @@ export function DecisionButtons({
         disabled={isLoading || (projection?.decisionCount ?? 0) === 0}
         variant="ghost"
         size="sm"
+        aria-label="Revert clause to its original text, ignoring all decisions"
       >
         <RotateCcw className="mr-2 h-4 w-4" />
         Revert to original

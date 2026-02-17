@@ -34,6 +34,7 @@ export function TrackedChangesDisplay({ changes, className }: TrackedChangesProp
               key={index}
               className="tracked-delete bg-red-50 text-red-700 line-through decoration-red-500 decoration-2 px-1 rounded"
               title="Deleted text"
+              aria-label={`Deleted: ${change.text}`}
             >
               {change.text}
             </del>
@@ -44,6 +45,7 @@ export function TrackedChangesDisplay({ changes, className }: TrackedChangesProp
               key={index}
               className="tracked-insert bg-green-50 text-green-700 no-underline border-b-2 border-green-500 px-1 rounded font-medium"
               title="Inserted text"
+              aria-label={`Inserted: ${change.text}`}
             >
               {change.text}
             </ins>

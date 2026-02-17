@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,17 +58,28 @@ export function ClauseText({
   const [viewMode, setViewMode] = useState<ViewMode>(
     hasFormatted ? "formatted" : "highlights"
   );
+
+  // Debug logging
+  console.log('[DEBUG ClauseText] Rendering with:', {
+    clauseId: clause?.id,
+    clauseTextLength: clause?.clauseText?.length,
+    effectiveTextLength: effectiveText?.length,
+    effectiveStatus,
+    hasTrackedChanges,
+    trackedChangesCount: trackedChanges?.length,
+    usingEffectiveText: !!effectiveText
+  });
   
   // T048: Edit mode state
   const [editedText, setEditedText] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   
   // Initialize edited text when entering edit mode
-  useState(() => {
+  useEffect(() => {
     if (isEditMode && clause) {
       setEditedText(effectiveText || clause.clauseText || "");
     }
-  });
+  }, [isEditMode, clause, effectiveText]);
   
   // T050: Handle save edit
   const handleSaveEdit = async () => {
@@ -292,13 +303,13 @@ export function ClauseText({
                 </div>
               )}
 
-              {/* Original clause text */}
+              {/* Clause text - use effectiveText if available (from decisions), otherwise original text */}
               {isLegacyFormat ? (
                 // Format v1: Show full clause text with optional highlighting
                 viewMode === "formatted" && hasFormatted ? (
-                  <MarkdownViewer content={clause.clauseTextFormatted!} />
+                  <MarkdownViewer content={effectiveText || clause.clauseTextFormatted || clause.clauseText} />
                 ) : (
-                  <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
+                  <ClauseTextWithHighlights text={effectiveText || clause.clauseText} excerpts={excerpts} />
                 )
               ) : (
                 // Format v2: Show findings with excerpt + context

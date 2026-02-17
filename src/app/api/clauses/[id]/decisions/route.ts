@@ -235,9 +235,28 @@ export async function POST(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    // T078: Enhanced database error handling
     console.error('[POST /api/clauses/[id]/decisions] Error:', error);
+    
+    // Check for Prisma-specific errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string; meta?: any };
+      
+      if (prismaError.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Duplicate decision detected. Please refresh and try again.' },
+          { status: 409 }
+        );
+      } else if (prismaError.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Clause not found. It may have been deleted.' },
+          { status: 404 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error. Please try again or contact support.' },
       { status: 500 }
     );
   }
@@ -314,9 +333,11 @@ export async function GET(
 
     return NextResponse.json({ decisions }, { status: 200 });
   } catch (error) {
+    // T078: Enhanced database error handling
     console.error('[GET /api/clauses/[id]/decisions] Error:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to retrieve decision history. Please try again or contact support.' },
       { status: 500 }
     );
   }

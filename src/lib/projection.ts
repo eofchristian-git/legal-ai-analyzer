@@ -47,6 +47,9 @@ import { computeTrackedChanges } from './tracked-changes';
  * @returns ProjectionResult with effective state
  */
 export async function computeProjection(clauseId: string): Promise<ProjectionResult> {
+  // T075: Performance monitoring
+  const startTime = Date.now();
+  
   // Fetch clause with its original text
   const clause = await db.analysisClause.findUnique({
     where: { id: clauseId },
@@ -205,6 +208,13 @@ export async function computeProjection(clauseId: string): Promise<ProjectionRes
     escalationReason,
     hasUnresolvedEscalation: currentStatus === ClauseStatus.ESCALATED,
   };
+
+  // T075: Log performance metrics
+  const duration = Date.now() - startTime;
+  console.log(
+    `[projection] Computed projection for clause ${clauseId} in ${duration}ms ` +
+    `(${decisions.length} total decisions, ${activeDecisions.length} active)`
+  );
 
   return projection;
 }

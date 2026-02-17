@@ -75,9 +75,23 @@ export async function GET(
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
+    // T078: Enhanced error handling
     console.error('[GET /api/clauses/[id]/projection] Error:', error);
+    
+    // Check for Prisma-specific errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string };
+      
+      if (prismaError.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Clause not found. It may have been deleted.' },
+          { status: 404 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to compute clause projection. Please try again or contact support.' },
       { status: 500 }
     );
   }

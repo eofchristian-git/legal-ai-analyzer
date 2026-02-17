@@ -1,14 +1,13 @@
 <!--
   Sync Impact Report
   ──────────────────
-  Version change: 1.0.0 → 1.1.0 (reliability enhancements)
+  Version change: 1.1.1 → 1.2.0 (event sourcing pattern)
   Added sections:
-    - AI Reliability Requirements (under Principle III)
-    - Data Design Patterns (new section)
-    - AI-specific limits in Technology Constraints (32K tokens, 180s timeout)
-    - Amendment Log
+    - Append-Only Event Sourcing pattern (under Data Design Patterns)
+    - Amendment entry for 1.2.0
   Modified sections:
-    - Technology Constraints — expanded with AI provider details
+    - Data Design Patterns — added event sourcing bullet
+    - Version and Last Amended date updated
   Removed sections: (none)
   Templates requiring updates:
     ✅ plan-template.md — Constitution Check section compatible; no changes needed
@@ -77,6 +76,12 @@ Prompts and parsing logic MUST be maintainable and auditable.
   are missing.
 - **Status Lifecycle**: Analysis records follow `pending` → `analyzing` →
   `completed` | `error`. Status transitions MUST be atomic.
+- **Append-Only Event Sourcing**: For user decision workflows (e.g., clause
+  decisions), store all actions as immutable events in an append-only log.
+  Current state is computed by replaying the event log. This ensures full
+  audit trails and enables undo/revert functionality without data loss.
+  The canonical pattern: `ClauseDecision` events → `computeProjection()` →
+  `ProjectionResult` (Feature 006).
 
 ## Development Workflow
 
@@ -99,9 +104,14 @@ Amendments require:
 All code changes SHOULD be checked for alignment with these principles
 during review.
 
-**Version**: 1.1.1 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-16
+**Version**: 1.2.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-17
 
 ### Amendment Log
+
+**1.2.0 (2026-02-17)**: Added "Append-Only Event Sourcing" pattern to Data Design
+Patterns section. Rationale: Codify the event sourcing architecture introduced in
+Feature 006 (Clause Decision Actions & Undo System) as a standard pattern for
+user decision workflows requiring full audit trails and undo capabilities.
 
 **1.1.1 (2026-02-16)**: Added Text Processing section to Technology Constraints,
 clarifying that standard text diff/patch libraries are acceptable dependencies when

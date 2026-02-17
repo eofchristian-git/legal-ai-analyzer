@@ -29,6 +29,24 @@ const projectionCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // ============================================================================
+// Cache Metrics (T074: Feature 006 Phase 10)
+// ============================================================================
+
+interface CacheMetrics {
+  hits: number;
+  misses: number;
+  invalidations: number;
+  sets: number;
+}
+
+const cacheMetrics: CacheMetrics = {
+  hits: 0,
+  misses: 0,
+  invalidations: 0,
+  sets: 0,
+};
+
+// ============================================================================
 // Cache Operations
 // ============================================================================
 
@@ -42,6 +60,8 @@ export function getCachedProjection(clauseId: string): ProjectionResult | null {
   const entry = projectionCache.get(clauseId);
   
   if (!entry) {
+    cacheMetrics.misses++;
+    console.log(`[cache] MISS for clause ${clauseId} (total misses: ${cacheMetrics.misses})`);
     return null; // Cache miss
   }
 
@@ -50,9 +70,13 @@ export function getCachedProjection(clauseId: string): ProjectionResult | null {
   if (ageMs > CACHE_TTL_MS) {
     // Expired - remove from cache and return null
     projectionCache.delete(clauseId);
+    cacheMetrics.misses++;
+    console.log(`[cache] EXPIRED for clause ${clauseId} (age: ${Math.round(ageMs / 1000)}s)`);
     return null;
   }
 
+  cacheMetrics.hits++;
+  console.log(`[cache] HIT for clause ${clauseId} (age: ${Math.round(ageMs / 1000)}s, total hits: ${cacheMetrics.hits})`);
   return entry.projection;
 }
 
@@ -67,6 +91,8 @@ export function setCachedProjection(clauseId: string, projection: ProjectionResu
     projection,
     cachedAt: new Date(),
   });
+  cacheMetrics.sets++;
+  console.log(`[cache] SET for clause ${clauseId} (cache size: ${projectionCache.size})`);
 }
 
 /**
@@ -77,7 +103,12 @@ export function setCachedProjection(clauseId: string, projection: ProjectionResu
  * @param clauseId - Clause ID to invalidate
  */
 export function invalidateCachedProjection(clauseId: string): void {
+  const existed = projectionCache.has(clauseId);
   projectionCache.delete(clauseId);
+  if (existed) {
+    cacheMetrics.invalidations++;
+    console.log(`[cache] INVALIDATE for clause ${clauseId} (total invalidations: ${cacheMetrics.invalidations})`);
+  }
 }
 
 /**
@@ -110,6 +141,43 @@ export function getCacheStats(): {
     size: projectionCache.size,
     entries,
   };
+}
+
+/**
+ * Get cache metrics for monitoring (T074: Feature 006).
+ * 
+ * @returns Object with hit/miss counts, hit rate, and current cache size
+ */
+export function getCacheMetrics(): {
+  hits: number;
+  misses: number;
+  hitRate: number;
+  invalidations: number;
+  sets: number;
+  currentSize: number;
+} {
+  const totalRequests = cacheMetrics.hits + cacheMetrics.misses;
+  const hitRate = totalRequests > 0 ? (cacheMetrics.hits / totalRequests) * 100 : 0;
+
+  return {
+    hits: cacheMetrics.hits,
+    misses: cacheMetrics.misses,
+    hitRate: Math.round(hitRate * 100) / 100, // Round to 2 decimal places
+    invalidations: cacheMetrics.invalidations,
+    sets: cacheMetrics.sets,
+    currentSize: projectionCache.size,
+  };
+}
+
+/**
+ * Reset cache metrics (useful for testing or resetting counters).
+ */
+export function resetCacheMetrics(): void {
+  cacheMetrics.hits = 0;
+  cacheMetrics.misses = 0;
+  cacheMetrics.invalidations = 0;
+  cacheMetrics.sets = 0;
+  console.log('[cache] Metrics reset');
 }
 
 /**

@@ -86,6 +86,52 @@ Analysis records use a status lifecycle: `pending` → `analyzing` → `complete
 - **Shared components** in `src/components/shared/`: `FileDropzone` (react-dropzone), `MarkdownViewer` (react-markdown + remark-gfm), `DisclaimerBanner`, `SeverityBadge`
 - **UI primitives**: shadcn/ui (New York style) in `src/components/ui/`, configured via `components.json`
 
+### Clause Decision Workflow (Feature 006)
+
+**Event Sourcing & Append-Only Pattern:**
+The decision system uses event sourcing—all clause decisions are stored as immutable events in the `ClauseDecision` table. The current state of a clause is computed by replaying its decision history chronologically.
+
+**Projection Engine** (`src/lib/projection.ts`):
+- `computeProjection(clauseId)` replays all `ClauseDecision` events for a clause
+- Computes `effectiveText`, `effectiveStatus`, and `trackedChanges`
+- Handles 7 action types: ACCEPT_DEVIATION, APPLY_FALLBACK, EDIT_MANUAL, ESCALATE, ADD_NOTE, UNDO, REVERT
+- UNDO marks a decision as undone (skip during replay)
+- REVERT resets clause to original state, clearing all active decisions
+- Returns `ProjectionResult` with full computed state
+
+**Caching Strategy** (`src/lib/cache.ts`):
+- In-memory per-clause caching of `ProjectionResult`
+- 5-minute TTL for stale entries
+- Invalidated on every decision write via `invalidateCachedProjection(clauseId)`
+- Cache metrics tracked: hits, misses, hit rate, invalidations, current size
+
+**API Endpoints:**
+- `POST /api/clauses/[id]/decisions` — Apply a decision action (requires REVIEW_CONTRACTS permission)
+- `GET /api/clauses/[id]/decisions` — Fetch decision history (chronological)
+- `GET /api/clauses/[id]/projection` — Get computed clause state (uses cache)
+
+**Permission System:**
+- Role-based access control (RBAC) via `RolePermission` mapping table
+- Permissions: `REVIEW_CONTRACTS`, `APPROVE_ESCALATIONS`, `MANAGE_USERS`, `MANAGE_PLAYBOOK`
+- Escalation locks: Only assigned approver or admin can make decisions on escalated clauses
+- Permission checks in `src/lib/permissions.ts`: `hasPermission()`, `canAccessContractReview()`, `canMakeDecisionOnClause()`
+
+**Conflict Detection:**
+- Optimistic locking using `updatedAt` timestamps on `AnalysisClause`
+- Compares `clauseUpdatedAtWhenLoaded` from client with current DB timestamp
+- Returns `conflictWarning` if stale (doesn't block, warns user)
+
+**UI Components:**
+- `decision-buttons.tsx` — 7 decision action buttons with loading states, permission checks, and conflict warnings
+- `decision-history-log.tsx` — Chronological timeline with undo indicators
+- `tracked-changes.tsx` — Visual diff using `<del>` and `<ins>` tags with CSS styling
+- `escalate-modal.tsx` — Escalation workflow with assignee selection and reason
+- `note-input.tsx` — Internal note modal for team collaboration
+
+**Performance Monitoring:**
+- Projection computation time logged to console with decision count
+- Cache hit/miss rates tracked with `getCacheMetrics()`
+
 ### Reliability Patterns
 
 **Clause Number Fallbacks:**
