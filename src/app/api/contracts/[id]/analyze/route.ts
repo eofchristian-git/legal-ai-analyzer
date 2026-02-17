@@ -5,12 +5,16 @@ import { analyzeWithClaude } from "@/lib/claude";
 import { parseContractAnalysis } from "@/lib/analysis-parser";
 import { getSessionOrUnauthorized } from "@/lib/auth-utils";
 import fs from "fs/promises";
+// Feature 008: Import document conversion utilities
+import { convertDocument, detectFormat } from "@/lib/document-converter";
+import { calculatePositions, injectClauseMarkers } from "@/lib/position-mapper";
+import { sanitizeHTML } from "@/lib/html-sanitizer";
 
 export const maxDuration = 180; // Allow up to 3 minutes for Claude to respond
 
 /**
  * Feature 008: Trigger document conversion after analysis completes
- * This is a fire-and-forget function that converts the document to HTML
+ * Calls conversion functions directly (no HTTP request needed)
  */
 async function triggerDocumentConversion(
   contractId: string,
@@ -20,29 +24,97 @@ async function triggerDocumentConversion(
   try {
     console.log(`[DocConversion] Starting conversion for contract ${contractId}`);
     
+    // Create ContractDocument record with 'processing' status
+    await db.contractDocument.upsert({
+      where: { contractId },
+      create: {
+        contractId,
+        originalPdfPath: filePath,
+        pageCount: 0,
+        conversionStatus: 'processing',
+      },
+      update: {
+        conversionStatus: 'processing',
+        conversionError: null,
+      },
+    });
+    
     // Read the file from disk
     const fileBuffer = await fs.readFile(filePath);
     
-    // Create a FormData-like object for the internal API
-    const formData = new FormData();
-    const blob = new Blob([fileBuffer], { type: 'application/octet-stream' });
-    const file = new File([blob], filename);
-    formData.append('file', file);
-    formData.append('contractId', contractId);
-    
-    // Call the internal conversion API
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/documents/convert`, {
-      method: 'POST',
-      body: formData,
+    // Detect format and convert document
+    const format = detectFormat(filename);
+    const conversionResult = await convertDocument({
+      fileBuffer,
+      format,
+      contractId,
     });
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Conversion API error: ${error.error || 'Unknown error'}`);
+    // Sanitize HTML
+    const sanitizedHTML = sanitizeHTML(conversionResult.html);
+    
+    // Fetch clauses for position mapping
+    const contract = await db.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        analysis: {
+          include: {
+            clauses: {
+              include: {
+                findings: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!contract?.analysis?.clauses) {
+      throw new Error('Contract has no analysis data for position mapping');
     }
     
-    const result = await response.json();
-    console.log(`[DocConversion] Completed for contract ${contractId}: ${result.message}`);
+    // Inject clause markers for position mapping
+    const markedHTML = injectClauseMarkers(
+      sanitizedHTML,
+      contract.analysis.clauses.map(c => ({
+        id: c.id,
+        clauseNumber: c.clauseNumber,
+        clauseText: c.clauseText,
+      }))
+    );
+    
+    // Calculate positions (using simplified algorithm for now)
+    const positions = await calculatePositions({
+      html: markedHTML,
+      documentId: contractId,
+      clauses: contract.analysis.clauses.map(c => ({
+        id: c.id,
+        clauseNumber: c.clauseNumber,
+        clauseText: c.clauseText,
+      })),
+      findings: contract.analysis.clauses.flatMap(c =>
+        c.findings.map(f => ({
+          id: f.id,
+          clauseId: c.id,
+          excerpt: f.excerpt || '',
+        }))
+      ),
+    });
+    
+    // Update ContractDocument with results
+    await db.contractDocument.update({
+      where: { contractId },
+      data: {
+        htmlContent: sanitizedHTML,
+        pageCount: conversionResult.pageCount || 1,
+        clausePositions: JSON.stringify(positions.clausePositions),
+        findingPositions: JSON.stringify(positions.findingPositions),
+        conversionStatus: 'completed',
+        conversionError: null,
+      },
+    });
+    
+    console.log(`[DocConversion] Completed for contract ${contractId}`);
   } catch (error) {
     console.error(`[DocConversion] Failed for contract ${contractId}:`, error);
     
