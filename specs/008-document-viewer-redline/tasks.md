@@ -57,13 +57,13 @@
 
 ### Document Viewer Components (US1)
 
-- [ ] T016 [P] [US1] Create base document viewer container `src/app/(app)/contracts/[id]/_components/document-viewer/document-viewer.tsx`: Main container with virtualized scrolling using react-window
-- [ ] T017 [P] [US1] Create HTML renderer component `src/app/(app)/contracts/[id]/_components/document-viewer/html-renderer.tsx`: Render HTML content with proper sanitization
-- [ ] T018 [P] [US1] Create highlight layer component `src/app/(app)/contracts/[id]/_components/document-viewer/highlight-layer.tsx`: Overlay for finding highlights with color coding (RED=high, YELLOW=medium, GREEN=low)
-- [ ] T019 [P] [US1] Create position utilities `src/app/(app)/contracts/[id]/_components/document-viewer/position-utils.ts`: Helper functions for coordinate calculations
-- [ ] T020 [US1] Integrate highlight tooltips in `highlight-layer.tsx`: Show finding summary and matched rule on hover
-- [ ] T021 [US1] Implement click handlers in `highlight-layer.tsx`: Open findings panel when highlight clicked
-- [ ] T022 [US1] Integrate document viewer into contract detail page `src/app/(app)/contracts/[id]/page.tsx`: Fetch document data, render DocumentViewer, maintain fallback to ClauseText
+- [X] T016 [P] [US1] Create base document viewer container `src/app/(app)/contracts/[id]/_components/document-viewer/document-viewer.tsx`: Main container with virtualized scrolling using react-window
+- [X] T017 [P] [US1] Create HTML renderer component `src/app/(app)/contracts/[id]/_components/document-viewer/html-renderer.tsx`: Render HTML content with proper sanitization
+- [X] T018 [P] [US1] Create highlight layer component `src/app/(app)/contracts/[id]/_components/document-viewer/highlight-layer.tsx`: Overlay for finding highlights with color coding (RED=high, YELLOW=medium, GREEN=low)
+- [X] T019 [P] [US1] Create position utilities `src/app/(app)/contracts/[id]/_components/document-viewer/position-utils.ts`: Helper functions for coordinate calculations
+- [X] T020 [US1] Integrate highlight tooltips in `highlight-layer.tsx`: Show finding summary and matched rule on hover
+- [X] T021 [US1] Implement click handlers in `highlight-layer.tsx`: Open findings panel when highlight clicked
+- [X] T022 [US1] Integrate document viewer into contract detail page `src/app/(app)/contracts/[id]/page.tsx`: Fetch document data, render DocumentViewer, maintain fallback to ClauseText
 
 **Checkpoint**: User Story 1 complete - full document rendering with interactive highlights works independently
 

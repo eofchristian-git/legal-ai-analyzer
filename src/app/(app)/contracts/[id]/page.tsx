@@ -35,8 +35,10 @@ import { RiskHeatmap } from "./_components/risk-heatmap";
 import { ActivityTimeline } from "./_components/activity-timeline";
 import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
+import { DocumentViewer } from "./_components/document-viewer/document-viewer";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
+import type { ContractDocumentData } from "@/types/document-viewer";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -66,6 +68,9 @@ export default function ContractDetailPage() {
     totalFindingCount: number; 
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>>({});
+  // Feature 008: Document viewer state
+  const [documentData, setDocumentData] = useState<ContractDocumentData | null>(null);
+  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'document'>('clause'); // Toggle between views
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
   const isRedirecting = useRef(false);
@@ -251,6 +256,38 @@ export default function ContractDetailPage() {
 
     fetchProjection();
   }, [selectedClauseId, historyRefreshKey]);
+
+  // Feature 008: Fetch document data for document viewer
+  useEffect(() => {
+    const fetchDocument = async () => {
+      if (!contract?.analysis || contract.analysis.clauses.length === 0) {
+        setDocumentData(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/contracts/${params.id}/document`);
+        if (response.ok) {
+          const data = await response.json();
+          setDocumentData(data.document);
+          // Enable document view mode if document is available
+          if (data.document?.htmlContent) {
+            setDocumentViewMode('document');
+          }
+        } else {
+          // Document not ready yet, stay in clause view mode
+          setDocumentData(null);
+          setDocumentViewMode('clause');
+        }
+      } catch (error) {
+        console.error('Failed to fetch document:', error);
+        setDocumentData(null);
+        setDocumentViewMode('clause');
+      }
+    };
+
+    fetchDocument();
+  }, [contract?.analysis, params.id]);
 
   // Reset edit mode when switching clauses
   useEffect(() => {
@@ -539,14 +576,50 @@ export default function ContractDetailPage() {
 
                 <ResizableHandle withHandle />
 
-                {/* Center panel: Clause text */}
+                {/* Center panel: Document viewer or clause text */}
                 <ResizablePanel defaultSize="45%" minSize="25%">
                   <div className="h-full overflow-hidden flex flex-col">
-                    <ClauseText 
-                      clause={selectedClause}
-                      effectiveStatus={projection?.effectiveStatus}
-                      trackedChanges={projection?.trackedChanges}
-                      isEditMode={isEditMode}
+                    {/* View mode toggle */}
+                    {documentData?.htmlContent && (
+                      <div className="p-2 border-b flex gap-2">
+                        <Button
+                          variant={documentViewMode === 'clause' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setDocumentViewMode('clause')}
+                        >
+                          Clause View
+                        </Button>
+                        <Button
+                          variant={documentViewMode === 'document' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setDocumentViewMode('document')}
+                        >
+                          Document View
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* Render based on view mode */}
+                    {documentViewMode === 'document' && documentData?.htmlContent ? (
+                      <DocumentViewer
+                        contractId={contract.id}
+                        htmlContent={documentData.htmlContent}
+                        pageCount={documentData.pageCount}
+                        clausePositions={documentData.clausePositions}
+                        findingPositions={documentData.findingPositions}
+                        selectedClauseId={selectedClauseId}
+                        onClauseClick={setSelectedClauseId}
+                        onFindingClick={(findingId, clauseId) => {
+                          setSelectedClauseId(clauseId);
+                          // Scroll to finding in findings panel
+                        }}
+                      />
+                    ) : (
+                      <ClauseText 
+                        clause={selectedClause}
+                        effectiveStatus={projection?.effectiveStatus}
+                        trackedChanges={projection?.trackedChanges}
+                        isEditMode={isEditMode}
                       effectiveText={projection?.effectiveText}
                       onEditModeChange={setIsEditMode}
                       onDecisionApplied={() => {
@@ -558,6 +631,7 @@ export default function ContractDetailPage() {
                       hasUnresolvedEscalation={projection?.hasUnresolvedEscalation}
                       editingFindingId={editingFindingId}
                     />
+                    )}
                   </div>
                 </ResizablePanel>
 
