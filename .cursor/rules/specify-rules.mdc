@@ -8,6 +8,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-11
 - TypeScript 5.x (Next.js 14+ App Router) + Next.js, React 18, Prisma ORM, shadcn/ui (New York style), NextAuth.js, lucide-react, sonner (toasts) (004-client-management)
 - SQLite via Prisma ORM; file uploads stored in `uploads/` directory on disk (004-client-management)
 - TypeScript 5.x with Next.js 14+ (App Router) + `@anthropic-ai/sdk` (Claude API), `prisma` (ORM), `zod` (validation), `react` 18+ (005-deviation-focused-analysis)
+- TypeScript 5.x with Next.js 14 (App Router) (006-clause-decision-actions)
+- SQLite via Prisma ORM with append-only `ClauseDecision` table (006-clause-decision-actions)
 
 - TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react (001-contract-review-findings)
 
@@ -28,9 +30,9 @@ npm test; npm run lint
 TypeScript 5.x (Next.js 16, App Router): Follow standard conventions
 
 ## Recent Changes
+- 006-clause-decision-actions: Added TypeScript 5.x with Next.js 14 (App Router)
 - 005-deviation-focused-analysis: Added TypeScript 5.x with Next.js 14+ (App Router) + `@anthropic-ai/sdk` (Claude API), `prisma` (ORM), `zod` (validation), `react` 18+
 - 004-client-management: Added TypeScript 5.x (Next.js 14+ App Router) + Next.js, React 18, Prisma ORM, shadcn/ui (New York style), NextAuth.js, lucide-react, sonner (toasts)
-- 002-contract-review-ux: Added TypeScript 5.x (Next.js 16, App Router) + Next.js, Prisma, @anthropic-ai/sdk, shadcn/ui, sonner, lucide-react, jspdf, react-markdown
 
 
 <!-- MANUAL ADDITIONS START -->

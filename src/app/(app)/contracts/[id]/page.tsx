@@ -34,6 +34,7 @@ import { FindingsPanel } from "./_components/findings-panel";
 import { RiskHeatmap } from "./_components/risk-heatmap";
 import { ActivityTimeline } from "./_components/activity-timeline";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
+import type { ProjectionResult } from "@/types/decisions"; // T031: Feature 006
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -47,6 +48,11 @@ export default function ContractDetailPage() {
   const [finalizing, setFinalizing] = useState(false);
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
   const [redirecting, setRedirecting] = useState(false);
+  // T031, T045: Feature 006 - Clause decision state
+  const [projection, setProjection] = useState<ProjectionResult | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  // T048: Feature 006 - Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
   const isRedirecting = useRef(false);
@@ -144,6 +150,32 @@ export default function ContractDetailPage() {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analyzing, params.id]);
+
+  // T031: Fetch projection when clause is selected (Feature 006)
+  useEffect(() => {
+    const fetchProjection = async () => {
+      if (!selectedClauseId) {
+        setProjection(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/clauses/${selectedClauseId}/projection`);
+        if (response.ok) {
+          const data = await response.json();
+          setProjection(data.projection);
+        } else {
+          console.error('Failed to fetch projection');
+          setProjection(null);
+        }
+      } catch (error) {
+        console.error('Error fetching projection:', error);
+        setProjection(null);
+      }
+    };
+
+    fetchProjection();
+  }, [selectedClauseId, historyRefreshKey]);
 
   async function cancelAnalysis() {
     try {
@@ -423,7 +455,21 @@ export default function ContractDetailPage() {
                 {/* Center panel: Clause text */}
                 <ResizablePanel defaultSize="45%" minSize="25%">
                   <div className="h-full overflow-hidden flex flex-col">
-                    <ClauseText clause={selectedClause} />
+                    <ClauseText 
+                      clause={selectedClause}
+                      effectiveStatus={projection?.effectiveStatus}
+                      trackedChanges={projection?.trackedChanges}
+                      isEditMode={isEditMode}
+                      effectiveText={projection?.effectiveText}
+                      onEditModeChange={setIsEditMode}
+                      onDecisionApplied={() => {
+                        loadContract();
+                        setHistoryRefreshKey((k) => k + 1);
+                        setTimelineRefreshKey((k) => k + 1);
+                      }}
+                      escalatedToUserName={projection?.escalatedToUserName}
+                      hasUnresolvedEscalation={projection?.hasUnresolvedEscalation}
+                    />
                   </div>
                 </ResizablePanel>
 
@@ -459,6 +505,14 @@ export default function ContractDetailPage() {
                         });
                         setTimelineRefreshKey((k) => k + 1);
                       }}
+                      projection={projection}
+                      onDecisionApplied={() => {
+                        loadContract();
+                        setHistoryRefreshKey((k) => k + 1);
+                        setTimelineRefreshKey((k) => k + 1);
+                      }}
+                      historyRefreshKey={historyRefreshKey}
+                      onEditManualClick={() => setIsEditMode(true)}
                     />
                   </div>
                 </ResizablePanel>
