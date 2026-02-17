@@ -191,14 +191,14 @@
 
 ### API Implementation for US7
 
-- [ ] T061 [US7] Add REVERT handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Create ClauseDecision with actionType=REVERT, empty payload, invalidate cache
-- [ ] T062 [US7] Update computeProjection() in src/lib/projection.ts: When REVERT encountered, reset currentText to originalText, status to DEVIATION_DETECTED, clear activeDecisions and undoneDecisionIds
+- [X] T061 [US7] Add REVERT handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Create ClauseDecision with actionType=REVERT, empty payload, invalidate cache
+- [X] T062 [US7] Update computeProjection() in src/lib/projection.ts: When REVERT encountered, reset currentText to originalText, status to DEVIATION_DETECTED, clear activeDecisions and undoneDecisionIds
 
 ### UI Components for US7
 
-- [ ] T063 [P] [US7] Add handleRevert() function in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Show confirmation modal "Are you sure? This will ignore all prior decisions.", call POST /api/clauses/[id]/decisions with actionType=REVERT
-- [ ] T064 [P] [US7] Add button state logic in decision-buttons.tsx: Enable "Revert to original" button only when decisionCount > 0 from ProjectionResult
-- [ ] T065 [US7] Update decision-history-log.tsx: Display REVERT marker in history log, show all prior decisions as still visible but not affecting projection
+- [X] T063 [P] [US7] Add handleRevert() function in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Show confirmation modal "Are you sure? This will ignore all prior decisions.", call POST /api/clauses/[id]/decisions with actionType=REVERT
+- [X] T064 [P] [US7] Add button state logic in decision-buttons.tsx: Enable "Revert to original" button only when decisionCount > 0 from ProjectionResult
+- [X] T065 [US7] Update decision-history-log.tsx: Display REVERT marker in history log, show all prior decisions as still visible but not affecting projection
 
 **Checkpoint**: User Story 7 complete - reviewers can reset clauses to original state with full history preserved
 

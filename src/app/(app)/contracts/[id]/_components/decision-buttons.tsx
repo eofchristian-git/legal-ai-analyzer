@@ -230,6 +230,58 @@ export function DecisionButtons({
   };
 
   /**
+   * T063: Handle Revert action - Reset clause to original state
+   */
+  const handleRevert = async () => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      'Are you sure you want to revert to the original clause text?\n\n' +
+      'This will reset the clause to its original state, ignoring all prior decisions. ' +
+      'The decision history will be preserved for audit purposes.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const response = await fetch(`/api/clauses/${clauseId}/decisions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: DecisionActionType.REVERT,
+          payload: {}, // Empty payload for REVERT
+          clauseUpdatedAtWhenLoaded: new Date().toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to revert clause');
+      }
+
+      const data = await response.json();
+
+      // Check for conflict warning
+      if (data.conflictWarning) {
+        toast.warning(data.conflictWarning.message, { duration: 8000 });
+      } else {
+        toast.success('Clause reverted to original state');
+      }
+
+      // Trigger parent refresh
+      onDecisionApplied?.();
+    } catch (error) {
+      console.error('Error reverting clause:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to revert clause');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
    * Helper: Format action type for display
    */
   const formatActionType = (actionType: string): string => {
@@ -318,7 +370,7 @@ export function DecisionButtons({
       </Button>
 
       <Button
-        onClick={() => toast.info('Revert to original - Phase 8')}
+        onClick={handleRevert}
         disabled={isLoading || (projection?.decisionCount ?? 0) === 0}
         variant="ghost"
         size="sm"

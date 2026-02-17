@@ -142,6 +142,7 @@ export async function POST(
         );
       }
     }
+    // T061: REVERT has empty payload - no validation needed
 
     // Fetch clause to check existence and get current state
     const clause = await db.analysisClause.findUnique({
