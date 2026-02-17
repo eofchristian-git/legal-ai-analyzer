@@ -224,10 +224,47 @@ model AnalysisClause {
   clauseTextFormatted String?
   position            Int
   createdAt    DateTime         @default(now())
+  
+  // NEW: Clause Decision Actions fields (Feature 006)
+  updatedAt    DateTime         @default(now()) @updatedAt  // For optimistic locking / conflict detection
+  originalText String?                                       // Original text for projection baseline
 
   findings AnalysisFinding[]
+  decisions ClauseDecision[]  // NEW: Decision history (Feature 006)
 
   @@unique([analysisId, position])
+  @@index([id, updatedAt])  // NEW: For efficient conflict detection (Feature 006)
+}
+
+// NEW: Role-Permission mapping for RBAC (Feature 006)
+// Note: SQLite doesn't support enums, so we use String with validation in app code
+// Valid roles: "admin" | "legal" | "compliance"
+// Valid permissions: "REVIEW_CONTRACTS" | "APPROVE_ESCALATIONS" | "MANAGE_USERS" | "MANAGE_PLAYBOOK"
+model RolePermission {
+  id         String   @id @default(cuid())
+  role       String                           // "admin" | "legal" | "compliance"
+  permission String                           // "REVIEW_CONTRACTS" | "APPROVE_ESCALATIONS" | "MANAGE_USERS" | "MANAGE_PLAYBOOK"
+  createdAt  DateTime @default(now())
+
+  @@unique([role, permission])  // One permission per role (no duplicates)
+  @@index([role])               // Fast lookup by role
+}
+
+// NEW: Clause Decision model for append-only history (Feature 006)
+// Note: SQLite doesn't support enums, so actionType is String with validation in app code
+// Valid actionTypes: "ACCEPT_DEVIATION" | "APPLY_FALLBACK" | "EDIT_MANUAL" | "ESCALATE" | "ADD_NOTE" | "UNDO" | "REVERT"
+model ClauseDecision {
+  id         String         @id @default(cuid())
+  clauseId   String
+  clause     AnalysisClause @relation(fields: [clauseId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User           @relation("ClauseDecisions", fields: [userId], references: [id])
+  actionType String                              // "ACCEPT_DEVIATION" | "APPLY_FALLBACK" | "EDIT_MANUAL" | "ESCALATE" | "ADD_NOTE" | "UNDO" | "REVERT"
+  timestamp  DateTime       @default(now())
+  payload    String                              // JSON string with action-specific data
+
+  @@index([clauseId, timestamp])  // For chronological replay in projection
+  @@index([clauseId])             // For cache invalidation queries
 }
 
 model AnalysisFinding {
@@ -343,4 +380,5 @@ model User {
   activityLogs               ActivityLog[]       @relation("ActivityLogs")
   clientsCreated             Client[]            @relation("ClientsCreated")
   clientContractsUploaded    ClientContract[]    @relation("ClientContractsUploaded")
+  decisions                  ClauseDecision[]    @relation("ClauseDecisions")  // NEW: Decision history (Feature 006)
 }

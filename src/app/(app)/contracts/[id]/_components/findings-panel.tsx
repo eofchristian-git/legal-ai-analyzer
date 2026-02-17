@@ -28,6 +28,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding, FindingComment, NegotiationItem, TriageDecision } from "./types";
+import type { ProjectionResult } from "@/types/decisions";
+import { DecisionButtons } from "./decision-buttons";
+import { DecisionHistoryLog } from "./decision-history-log";
 
 interface FindingsPanelProps {
   clause: Clause | null;
@@ -41,6 +44,11 @@ interface FindingsPanelProps {
     note?: string
   ) => void;
   onCommentAdded?: (findingId: string, comment: FindingComment) => void;
+  // NEW: Feature 006 - Decision actions
+  projection?: ProjectionResult | null;
+  onDecisionApplied?: () => void;
+  historyRefreshKey?: number;
+  onEditManualClick?: () => void;  // T049: Trigger edit mode
 }
 
 const severityOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
@@ -65,6 +73,10 @@ export function FindingsPanel({
   negotiationItems = [],
   onTriageDecision,
   onCommentAdded,
+  projection,
+  onDecisionApplied,
+  historyRefreshKey,
+  onEditManualClick,
 }: FindingsPanelProps) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [strategyOpen, setStrategyOpen] = useState(false);
@@ -171,6 +183,38 @@ export function FindingsPanel({
               onCommentAdded={onCommentAdded}
             />
           ))}
+
+          {/* Feature 006: Decision Actions & History */}
+          {clause && (
+            <>
+              <Separator className="my-4" />
+              
+              {/* Decision Buttons */}
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">
+                  Decision Actions
+                </p>
+                <DecisionButtons
+                  clauseId={clause.id}
+                  projection={projection}
+                  findings={clause.findings}
+                  onDecisionApplied={onDecisionApplied}
+                  onEditManualClick={onEditManualClick}
+                />
+              </div>
+
+              {/* Decision History */}
+              <div className="mt-6">
+                <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">
+                  Decision History
+                </p>
+                <DecisionHistoryLog
+                  clauseId={clause.id}
+                  refreshTrigger={historyRefreshKey}
+                />
+              </div>
+            </>
+          )}
         </div>
       </ScrollArea>
     </div>

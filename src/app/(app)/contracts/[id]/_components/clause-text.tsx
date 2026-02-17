@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -11,12 +12,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FileText, Highlighter, BookOpen, MapPin } from "lucide-react";
+import { FileText, Highlighter, BookOpen, MapPin, Save, X } from "lucide-react";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding } from "./types";
+import { ClauseStatus, TrackedChange } from "@/types/decisions";
+import { TrackedChangesDisplay } from "./tracked-changes";
+import { toast } from "sonner";
 
 interface ClauseTextProps {
   clause: Clause | null;
+  effectiveStatus?: ClauseStatus | null;  // NEW: Feature 006 - Clause status from projection
+  trackedChanges?: TrackedChange[];       // NEW: Feature 006 - Tracked changes for text modifications
+  isEditMode?: boolean;                    // T048: Feature 006 - Enable inline editing
+  effectiveText?: string | null;          // T048: The current effective text for editing
+  onEditModeChange?: (isEdit: boolean) => void;  // T048: Callback to toggle edit mode
+  onDecisionApplied?: () => void;         // T048: Callback after save
 }
 
 const riskLabel: Record<string, string> = {
@@ -27,14 +37,88 @@ const riskLabel: Record<string, string> = {
 
 type ViewMode = "formatted" | "highlights";
 
-export function ClauseText({ clause }: ClauseTextProps) {
+export function ClauseText({ 
+  clause, 
+  effectiveStatus, 
+  trackedChanges,
+  isEditMode = false,
+  effectiveText,
+  onEditModeChange,
+  onDecisionApplied,
+}: ClauseTextProps) {
   // Detect format: v1 has clauseText, v2 has empty clauseText with context fields
   const isLegacyFormat = !!clause?.clauseText && clause.clauseText.length > 0;
   const hasFormatted = !!clause?.clauseTextFormatted;
   const hasExcerpts = !!clause?.findings.some((f) => f.excerpt);
+  const hasTrackedChanges = trackedChanges && trackedChanges.length > 0;
   const [viewMode, setViewMode] = useState<ViewMode>(
     hasFormatted ? "formatted" : "highlights"
   );
+  
+  // T048: Edit mode state
+  const [editedText, setEditedText] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Initialize edited text when entering edit mode
+  useState(() => {
+    if (isEditMode && clause) {
+      setEditedText(effectiveText || clause.clauseText || "");
+    }
+  });
+  
+  // T050: Handle save edit
+  const handleSaveEdit = async () => {
+    if (!clause || !editedText.trim()) {
+      toast.error("Please enter some text");
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/clauses/${clause.id}/decisions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'EDIT_MANUAL',
+          payload: {
+            replacementText: editedText.trim(),
+          },
+          clauseUpdatedAtWhenLoaded: new Date().toISOString(),
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save edit');
+      }
+      
+      const data = await response.json();
+      
+      // Check for conflict warning
+      if (data.conflictWarning) {
+        toast.warning(data.conflictWarning.message, { duration: 8000 });
+      } else {
+        toast.success('Manual edit saved');
+      }
+      
+      // Exit edit mode
+      onEditModeChange?.(false);
+      
+      // Trigger parent refresh
+      onDecisionApplied?.();
+    } catch (error) {
+      console.error('Error saving manual edit:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save edit');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // T051: Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditedText("");
+    onEditModeChange?.(false);
+  };
 
   if (!clause) {
     return (
@@ -61,11 +145,37 @@ export function ClauseText({ clause }: ClauseTextProps) {
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="px-6 py-4 border-b bg-card shrink-0">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Badge variant="outline" className="text-xs font-mono shrink-0">
               {clause.clauseNumber ? `§${clause.clauseNumber}` : `#${clause.position}`}
             </Badge>
             <h2 className="text-sm font-semibold text-foreground">{clause.clauseName}</h2>
+            
+            {/* T027: Effective Status Badge (Feature 006) */}
+            {effectiveStatus && effectiveStatus !== 'DEVIATION_DETECTED' && effectiveStatus !== 'NO_DEVIATION' && (
+              <Badge 
+                variant="secondary"
+                className={cn(
+                  "text-xs shrink-0",
+                  effectiveStatus === 'ACCEPTED' && "bg-green-100 text-green-800 border-green-300",
+                  effectiveStatus === 'RESOLVED_APPLIED_FALLBACK' && "bg-blue-100 text-blue-800 border-blue-300",
+                  effectiveStatus === 'RESOLVED_MANUAL_EDIT' && "bg-purple-100 text-purple-800 border-purple-300",
+                  effectiveStatus === 'ESCALATED' && "bg-yellow-100 text-yellow-800 border-yellow-300"
+                )}
+              >
+                {effectiveStatus === 'ACCEPTED' && '✓ Accepted'}
+                {effectiveStatus === 'RESOLVED_APPLIED_FALLBACK' && 'Applied Fallback'}
+                {effectiveStatus === 'RESOLVED_MANUAL_EDIT' && 'Manually Edited'}
+                {effectiveStatus === 'ESCALATED' && 'Escalated'}
+              </Badge>
+            )}
+            
+            {/* T027: "Accepted deviation (playbook override)" tag */}
+            {effectiveStatus === 'ACCEPTED' && (
+              <span className="text-xs text-muted-foreground italic">
+                (playbook override)
+              </span>
+            )}
           </div>
           {showToggle && (
             <div className="flex items-center gap-1 border rounded-md p-0.5">
@@ -92,17 +202,81 @@ export function ClauseText({ clause }: ClauseTextProps) {
         </div>
       </div>
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-6 py-5">
-          {isLegacyFormat ? (
-            // Format v1: Show full clause text with optional highlighting
-            viewMode === "formatted" && hasFormatted ? (
-              <MarkdownViewer content={clause.clauseTextFormatted!} />
-            ) : (
-              <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
-            )
+        <div className="px-6 py-5 space-y-6">
+          {/* T048: Inline Editor Mode */}
+          {isEditMode ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Edit Clause Text
+                </h3>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              
+              <Textarea
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                placeholder="Enter custom clause text..."
+                className="min-h-[300px] text-sm leading-7 font-legal resize-none"
+                autoFocus
+              />
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={isSaving || !editedText.trim()}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  {isSaving ? 'Saving...' : 'Save Edit'}
+                </Button>
+                <Button
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Your changes will be saved and tracked. The original clause text will be preserved in the decision history.
+              </p>
+            </div>
           ) : (
-            // Format v2: Show findings with excerpt + context
-            <DeviationFocusedView findings={clause.findings} />
+            <>
+              {/* T036: Display tracked changes if present (Feature 006) */}
+              {hasTrackedChanges && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Tracked Changes
+                    </h3>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-md border">
+                    <TrackedChangesDisplay changes={trackedChanges!} />
+                  </div>
+                </div>
+              )}
+
+              {/* Original clause text */}
+              {isLegacyFormat ? (
+                // Format v1: Show full clause text with optional highlighting
+                viewMode === "formatted" && hasFormatted ? (
+                  <MarkdownViewer content={clause.clauseTextFormatted!} />
+                ) : (
+                  <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
+                )
+              ) : (
+                // Format v2: Show findings with excerpt + context
+                <DeviationFocusedView findings={clause.findings} />
+              )}
+            </>
           )}
         </div>
       </ScrollArea>

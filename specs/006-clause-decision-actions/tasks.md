@@ -19,9 +19,9 @@
 
 **Purpose**: Project initialization and dependency installation
 
-- [ ] T001 Review plan.md, spec.md, and research.md for implementation requirements
-- [ ] T002 Install diff-match-patch library: `npm install diff-match-patch @types/diff-match-patch`
-- [ ] T003 Verify existing dependencies (Next.js 14, Prisma, NextAuth, shadcn/ui, Lucide-react, Sonner)
+- [X] T001 Review plan.md, spec.md, and research.md for implementation requirements
+- [X] T002 Install diff-match-patch library: `npm install diff-match-patch @types/diff-match-patch`
+- [X] T003 Verify existing dependencies (Next.js 14, Prisma, NextAuth, shadcn/ui, Lucide-react, Sonner)
 
 **Checkpoint**: Dependencies ready, design documents reviewed
 
@@ -35,30 +35,30 @@
 
 ### Database Schema & Migrations
 
-- [ ] T004 Add DecisionActionType enum to prisma/schema.prisma (7 values: ACCEPT_DEVIATION, APPLY_FALLBACK, EDIT_MANUAL, ESCALATE, ADD_NOTE, UNDO, REVERT)
-- [ ] T005 [P] Add Permission enum to prisma/schema.prisma (4 values: REVIEW_CONTRACTS, APPROVE_ESCALATIONS, MANAGE_USERS, MANAGE_PLAYBOOK)
-- [ ] T006 [P] Create RolePermission model in prisma/schema.prisma with role-permission unique constraint and role index
-- [ ] T007 Create ClauseDecision model in prisma/schema.prisma with clauseId-timestamp composite index and clauseId index
-- [ ] T008 Extend AnalysisClause model in prisma/schema.prisma: Add updatedAt (@updatedAt), originalText (String?), decisions relation, and id-updatedAt index
-- [ ] T009 Extend User model in prisma/schema.prisma: Add decisions relation to ClauseDecision
-- [ ] T010 Run database migration: `npx prisma db push` and `npx prisma generate`
-- [ ] T011 Create data migration script scripts/migrate-original-text.ts to copy clauseText to originalText for existing clauses
-- [ ] T012 Run data migration script: `npx ts-node scripts/migrate-original-text.ts`
-- [ ] T013 Seed RolePermission table with default permissions (legal: REVIEW_CONTRACTS + APPROVE_ESCALATIONS)
+- [X] T004 Add DecisionActionType enum to prisma/schema.prisma (7 values: ACCEPT_DEVIATION, APPLY_FALLBACK, EDIT_MANUAL, ESCALATE, ADD_NOTE, UNDO, REVERT)
+- [X] T005 [P] Add Permission enum to prisma/schema.prisma (4 values: REVIEW_CONTRACTS, APPROVE_ESCALATIONS, MANAGE_USERS, MANAGE_PLAYBOOK)
+- [X] T006 [P] Create RolePermission model in prisma/schema.prisma with role-permission unique constraint and role index
+- [X] T007 Create ClauseDecision model in prisma/schema.prisma with clauseId-timestamp composite index and clauseId index
+- [X] T008 Extend AnalysisClause model in prisma/schema.prisma: Add updatedAt (@updatedAt), originalText (String?), decisions relation, and id-updatedAt index
+- [X] T009 Extend User model in prisma/schema.prisma: Add decisions relation to ClauseDecision
+- [X] T010 Run database migration: `npx prisma db push` and `npx prisma generate`
+- [X] T011 Create data migration script scripts/migrate-original-text.ts to copy clauseText to originalText for existing clauses
+- [X] T012 Run data migration script: `npx ts-node scripts/migrate-original-text.ts`
+- [X] T013 Seed RolePermission table with default permissions (legal: REVIEW_CONTRACTS + APPROVE_ESCALATIONS)
 
 ### TypeScript Types & Shared Utilities
 
-- [ ] T014 [P] Create src/types/decisions.ts with DecisionActionType, ClauseStatus, ClauseDecision, payload interfaces, ProjectionResult, and TrackedChange types
-- [ ] T015 [P] Create src/lib/permissions.ts with hasPermission(), canAccessContractReview(), and canMakeDecisionOnClause() async functions (queries RolePermission table)
-- [ ] T016 [P] Create src/lib/tracked-changes.ts with computeTrackedChanges() using diff-match-patch library (1s timeout, semantic cleanup)
-- [ ] T017 Create src/lib/projection.ts with computeProjection() function implementing chronological replay algorithm (handles UNDO, REVERT markers)
-- [ ] T018 Create src/lib/cache.ts with getCachedProjection(), setCachedProjection(), invalidateCachedProjection() using in-memory Map (5-minute TTL backup)
+- [X] T014 [P] Create src/types/decisions.ts with DecisionActionType, ClauseStatus, ClauseDecision, payload interfaces, ProjectionResult, and TrackedChange types
+- [X] T015 [P] Create src/lib/permissions.ts with hasPermission(), canAccessContractReview(), and canMakeDecisionOnClause() async functions (queries RolePermission table)
+- [X] T016 [P] Create src/lib/tracked-changes.ts with computeTrackedChanges() using diff-match-patch library (1s timeout, semantic cleanup)
+- [X] T017 Create src/lib/projection.ts with computeProjection() function implementing chronological replay algorithm (handles UNDO, REVERT markers)
+- [X] T018 Create src/lib/cache.ts with getCachedProjection(), setCachedProjection(), invalidateCachedProjection() using in-memory Map (5-minute TTL backup)
 
 ### API Foundation
 
-- [ ] T019 [P] Create src/app/api/clauses/[id]/decisions/route.ts: POST handler stub (authentication check only, no implementation)
-- [ ] T020 [P] Create src/app/api/clauses/[id]/decisions/route.ts: GET handler stub (history retrieval, authentication check only)
-- [ ] T021 [P] Create src/app/api/clauses/[id]/projection/route.ts: GET handler stub (projection retrieval, authentication check only)
+- [X] T019 [P] Create src/app/api/clauses/[id]/decisions/route.ts: POST handler stub (authentication check only, no implementation)
+- [X] T020 [P] Create src/app/api/clauses/[id]/decisions/route.ts: GET handler stub (history retrieval, authentication check only)
+- [X] T021 [P] Create src/app/api/clauses/[id]/projection/route.ts: GET handler stub (projection retrieval, authentication check only)
 
 **Checkpoint**: Foundation ready - projection engine, permissions, cache, and database schema complete. User story implementation can now begin in parallel.
 
@@ -72,19 +72,19 @@
 
 ### API Implementation for US1
 
-- [ ] T022 [US1] Implement POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Handle ACCEPT_DEVIATION action, create ClauseDecision record, invalidate cache, return updated projection
-- [ ] T023 [US1] Add conflict detection to POST /api/clauses/[id]/decisions: Compare clauseUpdatedAtWhenLoaded with current updatedAt, return conflictWarning if stale
-- [ ] T024 [US1] Add permission check to POST /api/clauses/[id]/decisions: Call canMakeDecisionOnClause(), return 403 if unauthorized
-- [ ] T025 [US1] Implement GET /api/clauses/[id]/projection in src/app/api/clauses/[id]/projection/route.ts: Check cache, compute projection if miss, set cache, return ProjectionResult
+- [X] T022 [US1] Implement POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Handle ACCEPT_DEVIATION action, create ClauseDecision record, invalidate cache, return updated projection
+- [X] T023 [US1] Add conflict detection to POST /api/clauses/[id]/decisions: Compare clauseUpdatedAtWhenLoaded with current updatedAt, return conflictWarning if stale
+- [X] T024 [US1] Add permission check to POST /api/clauses/[id]/decisions: Call canMakeDecisionOnClause(), return 403 if unauthorized
+- [X] T025 [US1] Implement GET /api/clauses/[id]/projection in src/app/api/clauses/[id]/projection/route.ts: Check cache, compute projection if miss, set cache, return ProjectionResult
 
 ### UI Components for US1
 
-- [ ] T026 [P] [US1] Create src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Render 5 core action buttons (accept, replace, edit, escalate, note) + 2 safety buttons (undo, revert) with icons and labels
-- [ ] T027 [P] [US1] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Display effectiveStatus badge, show "Accepted deviation (playbook override)" tag when status is ACCEPTED
-- [ ] T028 [US1] Update src/app/(app)/contracts/[id]/_components/clause-list.tsx: Update clause badge to show ACCEPTED status after decision
-- [ ] T029 [US1] Add handleAcceptDeviation() function in decision-buttons.tsx: Call POST /api/clauses/[id]/decisions with actionType=ACCEPT_DEVIATION, handle optional comment input, show toast on success/error
-- [ ] T030 [US1] Add conflict warning toast in decision-buttons.tsx: Show warning message with "Undo my change" action button if conflictWarning returned
-- [ ] T031 [US1] Update src/app/(app)/contracts/[id]/page.tsx: Integrate decision-buttons component into clause detail drawer
+- [X] T026 [P] [US1] Create src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Render 5 core action buttons (accept, replace, edit, escalate, note) + 2 safety buttons (undo, revert) with icons and labels
+- [X] T027 [P] [US1] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Display effectiveStatus badge, show "Accepted deviation (playbook override)" tag when status is ACCEPTED
+- [X] T028 [US1] Update src/app/(app)/contracts/[id]/_components/clause-list.tsx: Update clause badge to show ACCEPTED status after decision
+- [X] T029 [US1] Add handleAcceptDeviation() function in decision-buttons.tsx: Call POST /api/clauses/[id]/decisions with actionType=ACCEPT_DEVIATION, handle optional comment input, show toast on success/error
+- [X] T030 [US1] Add conflict warning toast in decision-buttons.tsx: Show warning message with "Undo my change" action button if conflictWarning returned
+- [X] T031 [US1] Update src/app/(app)/contracts/[id]/page.tsx: Integrate decision-buttons component into clause detail drawer
 
 **Checkpoint**: User Story 1 complete - reviewers can accept deviations with optional comments, immediate UI feedback, and conflict warnings
 
@@ -98,16 +98,16 @@
 
 ### API Implementation for US2
 
-- [ ] T032 [US2] Add APPLY_FALLBACK handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate replacementText, source, playbookRuleId, create ClauseDecision, invalidate cache
-- [ ] T033 [US2] Add fallback language retrieval logic in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Query playbook API for fallback/preferred language when "Replace with fallback" clicked
+- [X] T032 [US2] Add APPLY_FALLBACK handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate replacementText, source, playbookRuleId, create ClauseDecision, invalidate cache
+- [X] T033 [US2] Add fallback language retrieval logic in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Query playbook API for fallback/preferred language when "Replace with fallback" clicked
 
 ### UI Components for US2
 
-- [ ] T034 [P] [US2] Create src/app/(app)/contracts/[id]/_components/tracked-changes.tsx: Render TrackedChange array using <del> and <ins> tags with CSS styling (red strikethrough for delete, green underline for insert)
-- [ ] T035 [P] [US2] Add tracked-changes CSS in src/app/(app)/contracts/[id]/_components/tracked-changes.tsx or globals.css: Style .tracked-delete (red background, strikethrough) and .tracked-insert (green background, underline) with high contrast mode support
-- [ ] T036 [US2] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Display tracked changes when effectiveText differs from originalText
-- [ ] T037 [US2] Add handleApplyFallback() function in decision-buttons.tsx: Fetch fallback language, call POST /api/clauses/[id]/decisions with actionType=APPLY_FALLBACK, update UI with tracked changes
-- [ ] T038 [US2] Add button state logic in decision-buttons.tsx: Disable/hide "Replace with fallback" button if playbook rule has no fallback language
+- [X] T034 [P] [US2] Create src/app/(app)/contracts/[id]/_components/tracked-changes.tsx: Render TrackedChange array using <del> and <ins> tags with CSS styling (red strikethrough for delete, green underline for insert)
+- [X] T035 [P] [US2] Add tracked-changes CSS in src/app/(app)/contracts/[id]/_components/tracked-changes.tsx or globals.css: Style .tracked-delete (red background, strikethrough) and .tracked-insert (green background, underline) with high contrast mode support
+- [X] T036 [US2] Update src/app/(app)/contracts/[id]/_components/clause-text.tsx: Display tracked changes when effectiveText differs from originalText
+- [X] T037 [US2] Add handleApplyFallback() function in decision-buttons.tsx: Fetch fallback language, call POST /api/clauses/[id]/decisions with actionType=APPLY_FALLBACK, update UI with tracked changes
+- [X] T038 [US2] Add button state logic in decision-buttons.tsx: Disable/hide "Replace with fallback" button if playbook rule has no fallback language
 
 **Checkpoint**: User Story 2 complete - reviewers can replace with fallback language and see visual tracked changes
 
@@ -121,16 +121,16 @@
 
 ### API Implementation for US6
 
-- [ ] T039 [US6] Add UNDO handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Create ClauseDecision with actionType=UNDO, payload.undoneDecisionId, invalidate cache
-- [ ] T040 [US6] Update computeProjection() in src/lib/projection.ts: Add undoneDecisionIds Set, skip decisions marked as undone when replaying history
-- [ ] T041 [US6] Add GET /api/clauses/[id]/decisions implementation in src/app/api/clauses/[id]/decisions/route.ts: Query ClauseDecision records ordered by timestamp, include user name, return decision history
+- [X] T039 [US6] Add UNDO handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Create ClauseDecision with actionType=UNDO, payload.undoneDecisionId, invalidate cache
+- [X] T040 [US6] Update computeProjection() in src/lib/projection.ts: Add undoneDecisionIds Set, skip decisions marked as undone when replaying history
+- [X] T041 [US6] Add GET /api/clauses/[id]/decisions implementation in src/app/api/clauses/[id]/decisions/route.ts: Query ClauseDecision records ordered by timestamp, include user name, return decision history
 
 ### UI Components for US6
 
-- [ ] T042 [P] [US6] Add handleUndo() function in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Fetch last decision from history, call POST /api/clauses/[id]/decisions with actionType=UNDO, update UI
-- [ ] T043 [P] [US6] Add button state logic in decision-buttons.tsx: Enable "Undo" button only when decisionCount > 0 from ProjectionResult
-- [ ] T044 [US6] Create src/app/(app)/contracts/[id]/_components/decision-history-log.tsx: Display decision history with chronological list, mark undone decisions with strikethrough or "UNDONE" label
-- [ ] T045 [US6] Update src/app/(app)/contracts/[id]/page.tsx: Add decision history log component (collapsible section or modal)
+- [X] T042 [P] [US6] Add handleUndo() function in src/app/(app)/contracts/[id]/_components/decision-buttons.tsx: Fetch last decision from history, call POST /api/clauses/[id]/decisions with actionType=UNDO, update UI
+- [X] T043 [P] [US6] Add button state logic in decision-buttons.tsx: Enable "Undo" button only when decisionCount > 0 from ProjectionResult
+- [X] T044 [US6] Create src/app/(app)/contracts/[id]/_components/decision-history-log.tsx: Display decision history with chronological list, mark undone decisions with strikethrough or "UNDONE" label
+- [X] T045 [US6] Update src/app/(app)/contracts/[id]/page.tsx: Add decision history log component (collapsible section or modal)
 
 **Checkpoint**: User Story 6 complete - reviewers can undo decisions with multiple levels supported and view decision history
 
@@ -144,15 +144,15 @@
 
 ### API Implementation for US3
 
-- [ ] T046 [US3] Add EDIT_MANUAL handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate replacementText, create ClauseDecision, invalidate cache
-- [ ] T047 [US3] Update computeTrackedChanges() in src/lib/tracked-changes.ts: Ensure diff computed from currentEffectiveText (not originalText) when manual edit applied after fallback replacement
+- [X] T046 [US3] Add EDIT_MANUAL handling to POST /api/clauses/[id]/decisions in src/app/api/clauses/[id]/decisions/route.ts: Validate replacementText, create ClauseDecision, invalidate cache
+- [X] T047 [US3] Update computeTrackedChanges() in src/lib/tracked-changes.ts: Ensure diff computed from currentEffectiveText (not originalText) when manual edit applied after fallback replacement
 
 ### UI Components for US3
 
-- [ ] T048 [P] [US3] Add inline editor UI in src/app/(app)/contracts/[id]/_components/clause-text.tsx: Add contentEditable textarea or rich text input with Save/Cancel buttons
-- [ ] T049 [P] [US3] Add handleEditManual() function in decision-buttons.tsx: Enable inline editor mode when "Edit manually" clicked
-- [ ] T050 [US3] Add handleSaveEdit() function in clause-text.tsx: Call POST /api/clauses/[id]/decisions with actionType=EDIT_MANUAL and replacementText from editor, update UI
-- [ ] T051 [US3] Add handleCancelEdit() function in clause-text.tsx: Close inline editor without saving changes
+- [X] T048 [P] [US3] Add inline editor UI in src/app/(app)/contracts/[id]/_components/clause-text.tsx: Add contentEditable textarea or rich text input with Save/Cancel buttons
+- [X] T049 [P] [US3] Add handleEditManual() function in decision-buttons.tsx: Enable inline editor mode when "Edit manually" clicked
+- [X] T050 [US3] Add handleSaveEdit() function in clause-text.tsx: Call POST /api/clauses/[id]/decisions with actionType=EDIT_MANUAL and replacementText from editor, update UI
+- [X] T051 [US3] Add handleCancelEdit() function in clause-text.tsx: Close inline editor without saving changes
 
 **Checkpoint**: User Story 3 complete - reviewers can manually edit clause text with tracked changes
 
@@ -386,3 +386,34 @@ With 2-3 developers after Foundational complete:
 - Foundational phase is critical - no shortcuts
 - Projection engine and cache are core to all stories
 - Manual testing only (no test framework configured)
+
+---
+
+## Future Enhancements (Post-MVP)
+
+### Feature 011: Per-Finding Decision Actions
+
+**Status**: Spec Draft (see `specs/011-per-finding-actions/`)  
+**Priority**: P2 (Post-MVP Enhancement)  
+**Depends On**: Feature 006 Phase 10 completion
+
+**Key Capability**: Enable reviewers to make granular decisions on individual findings within a clause (e.g., accept Finding A, apply Finding B's fallback, escalate Finding C).
+
+**Benefits**:
+- More surgical control when clause has multiple findings
+- Better audit trail (know which finding prompted which action)
+- Intuitive UX (action buttons right on finding cards)
+- Per-finding undo/revert (no all-or-nothing operations)
+
+**Technical Summary**:
+- Add optional `findingId` field to `ClauseDecision`
+- Enhance projection algorithm to handle finding-level decisions
+- Add action buttons to each finding card in UI
+- Backward compatible with clause-level decisions
+
+**Next Steps**:
+1. Review `specs/011-per-finding-actions/spec.md`
+2. Create implementation plan and task breakdown
+3. Schedule for development after Feature 006 Polish phase
+
+**User Feedback**: "I think we should be able to click on specific finding and be able to perform all of the actions per each finding" (2026-02-17)
