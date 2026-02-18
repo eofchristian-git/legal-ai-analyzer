@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "I want to replace current HTML contract viewer with ONLYOFFICE"
 
+## Clarifications
+
+### Session 2026-02-18
+
+- Q: What monitoring and observability should be implemented for the ONLYOFFICE integration? → A: Basic monitoring - Application logs for errors/warnings, health check endpoint for ONLYOFFICE availability, alert on complete service outage only
+- Q: Are there specific compliance requirements (e.g., SOC 2, GDPR, legal discovery) that impact how documents and changes must be tracked? → A: Basic audit trail - Log all user actions (view, edit, export) with timestamps and user attribution, 90-day retention for non-finalized contracts, indefinite for finalized
+- Q: What are the reliability expectations for the ONLYOFFICE Document Server? → A: Standard reliability - 95% uptime target, 5-minute outage detection, manual restart acceptable, single instance with monitoring
+- Q: How should findings be mapped to document positions for comment insertion? → A: Text search matching - Use ONLYOFFICE Document Builder API to search for each finding's clause text in the document and attach comments at the matched position, handle duplicates by matching surrounding context
+- Q: What is the expected concurrent editing model for the MVP? → A: Single editor + live viewers - One user edits at a time (first to enter edit mode), others can view in real-time, editor lock released on close or after 15-min idle timeout
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View Contract with Perfect Formatting Fidelity (Priority: P1)
@@ -156,7 +166,7 @@ Multiple legal reviewers from the same organization want to review a contract si
 - **FR-005**: System MUST generate secure time-limited JWT tokens for authenticating document viewing sessions with ONLYOFFICE
 - **FR-006**: System MUST create an API endpoint (`/api/contracts/[id]/download`) that serves contract files to ONLYOFFICE Document Server
 - **FR-007**: System MUST create an API callback endpoint (`/api/onlyoffice/callback/[contractId]`) that receives document save events from ONLYOFFICE
-- **FR-008**: System MUST inject AI-generated findings as ONLYOFFICE comments positioned at relevant text locations
+- **FR-008**: System MUST inject AI-generated findings as ONLYOFFICE comments by using text search matching via the Document Builder API to locate each finding's clause text in the document, resolving duplicates by matching surrounding context
 - **FR-009**: System MUST apply risk-level color coding to finding comments (RED for high risk, YELLOW for medium, GREEN for low)
 - **FR-010**: System MUST support clicking on sidebar findings to jump to corresponding document comments in ONLYOFFICE
 - **FR-011**: System MUST enable ONLYOFFICE Track Changes mode to display decision-based modifications
@@ -181,6 +191,39 @@ Multiple legal reviewers from the same organization want to review a contract si
 - **FR-030**: System MUST display user presence indicators showing who is currently viewing the contract (P3 feature)
 - **FR-031**: System MUST sync finding comments and tracked changes in real-time across collaborative sessions (P3 feature)
 - **FR-032**: System MUST handle ONLYOFFICE conflict resolution when multiple users edit the same text simultaneously (P3 feature)
+
+### Monitoring & Observability Requirements
+
+- **FR-033**: System MUST log all ONLYOFFICE-related errors and warnings to application logs with context (contractId, userId, operation)
+- **FR-034**: System MUST provide a health check endpoint that verifies ONLYOFFICE Document Server is reachable and responsive
+- **FR-035**: System MUST send alerts when ONLYOFFICE Document Server is completely unavailable (no successful health checks for 5+ minutes)
+- **FR-036**: System MUST log session creation, token refresh, document load, and export operations with timestamps for audit trail
+
+### Compliance & Audit Requirements
+
+- **FR-037**: System MUST log all user actions on contracts (view, edit, export, comment, tracked change) with user ID, timestamp, and contract ID
+- **FR-038**: System MUST retain audit logs for finalized contracts indefinitely for legal discovery purposes
+- **FR-039**: System MUST retain audit logs for non-finalized (draft/cancelled) contracts for 90 days before archival or deletion
+- **FR-040**: System MUST attribute every ONLYOFFICE tracked change to the specific user who made the corresponding decision
+- **FR-041**: System MUST preserve original uploaded contract files indefinitely regardless of contract status
+- **FR-042**: System MUST record document version history when ONLYOFFICE save callbacks persist modified documents
+
+### Reliability & Service Level Requirements
+
+- **FR-043**: ONLYOFFICE Document Server MUST maintain a 95% uptime target measured over a rolling 30-day window
+- **FR-044**: System MUST detect ONLYOFFICE Document Server outages within 5 minutes via periodic health checks
+- **FR-045**: System MUST display a user-friendly fallback (document download link + read-only clause panel) when ONLYOFFICE is unavailable
+- **FR-046**: System MUST support manual restart of ONLYOFFICE Document Server without data loss for in-progress editing sessions (via callback save on close)
+- **FR-047**: System MUST run as a single ONLYOFFICE instance; multi-instance/HA deployment is not required at this stage
+
+### Concurrent Editing Requirements
+
+- **FR-048**: System MUST allow only one user to be in edit mode for a given contract at any time (first user to enter edit mode acquires the lock)
+- **FR-049**: System MUST allow multiple users to view a contract in real-time while one user is editing
+- **FR-050**: System MUST automatically release the editor lock after 15 minutes of idle activity (no edits or interactions)
+- **FR-051**: System MUST release the editor lock when the editing user closes the document or navigates away
+- **FR-052**: System MUST display a "Document being edited by [username]" indicator to viewers, with an option to request edit access
+- **FR-053**: System MUST notify the current editor when another user requests edit access
 
 ### Key Entities
 

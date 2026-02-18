@@ -33,12 +33,17 @@
 
 ### Clarifications Resolved
 
-**FR-027**: ONLYOFFICE session token expiration time resolved - User selected 4 hours for active review sessions. This provides a balanced approach: long enough for thorough contract reviews without leaving tokens valid indefinitely, with automatic refresh mechanism for longer sessions.
+1. **FR-027**: ONLYOFFICE session token expiration time → 4 hours with auto-refresh
+2. **Monitoring**: Basic monitoring → Application logs, health check endpoint, outage alerts
+3. **Compliance**: Basic audit trail → Log all actions with timestamps/user attribution, 90-day/indefinite retention
+4. **Reliability**: Standard reliability → 95% uptime target, 5-minute outage detection, single instance
+5. **Finding Mapping**: Text search matching → ONLYOFFICE Document Builder API search with surrounding context for duplicates
+6. **Concurrent Editing**: Single editor + live viewers → Editor lock with 15-min idle timeout, real-time viewing for others
 
 ### Validation Summary
 
 - **Content Quality**: ✅ All items pass
-- **Requirement Completeness**: ✅ All items pass (clarification resolved)
+- **Requirement Completeness**: ✅ All items pass (6 clarifications resolved)
 - **Feature Readiness**: ✅ All items pass
 
-**Status**: ✅ **READY** - Specification is complete and ready for `/speckit.plan`
+**Status**: ✅ **READY** - Specification is complete and ready for implementation planning
