@@ -12,24 +12,38 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FileText, Highlighter, BookOpen, MapPin, Save, X, AlertTriangle } from "lucide-react";
+import {
+  FileText,
+  Highlighter,
+  BookOpen,
+  MapPin,
+  Save,
+  X,
+  AlertTriangle,
+  Pencil,
+  ArrowDown,
+  CheckCircle2,
+  GitMerge,
+  Loader2,
+} from "lucide-react";
 import { MarkdownViewer } from "@/components/shared/markdown-viewer";
 import type { Clause, Finding } from "./types";
-import { ClauseStatus, DerivedClauseStatus, TrackedChange } from "@/types/decisions";
-import { TrackedChangesDisplay } from "./tracked-changes";
+import { ClauseStatus, DerivedClauseStatus, FindingStatusEntry, TrackedChange, ProjectionResult } from "@/types/decisions";
 import { toast } from "sonner";
 
 interface ClauseTextProps {
   clause: Clause | null;
-  effectiveStatus?: ClauseStatus | DerivedClauseStatus | null;  // Feature 006/007 - Clause status from projection
-  trackedChanges?: TrackedChange[];       // NEW: Feature 006 - Tracked changes for text modifications
-  isEditMode?: boolean;                    // T048: Feature 006 - Enable inline editing
-  effectiveText?: string | null;          // T048: The current effective text for editing
-  onEditModeChange?: (isEdit: boolean) => void;  // T048: Callback to toggle edit mode
-  onDecisionApplied?: () => void;         // T048: Callback after save
-  escalatedToUserName?: string | null;    // T059: Show assignee name for escalated clauses
-  hasUnresolvedEscalation?: boolean;      // T060: Show locked state
-  editingFindingId?: string | null;       // T020c: Feature 007 - Finding ID for manual edits
+  effectiveStatus?: ClauseStatus | DerivedClauseStatus | null;
+  trackedChanges?: TrackedChange[];
+  isEditMode?: boolean;
+  effectiveText?: string | null;
+  onEditModeChange?: (isEdit: boolean) => void;
+  onDecisionApplied?: () => void;
+  escalatedToUserName?: string | null;
+  hasUnresolvedEscalation?: boolean;
+  editingFindingId?: string | null;
+  findingStatuses?: Record<string, FindingStatusEntry>;
+  onProjectionUpdate?: (projection: ProjectionResult) => void;
 }
 
 const riskLabel: Record<string, string> = {
@@ -40,9 +54,9 @@ const riskLabel: Record<string, string> = {
 
 type ViewMode = "formatted" | "highlights";
 
-export function ClauseText({ 
-  clause, 
-  effectiveStatus, 
+export function ClauseText({
+  clause,
+  effectiveStatus,
   trackedChanges,
   isEditMode = false,
   effectiveText,
@@ -51,8 +65,9 @@ export function ClauseText({
   escalatedToUserName,
   hasUnresolvedEscalation,
   editingFindingId,
+  findingStatuses,
+  onProjectionUpdate,
 }: ClauseTextProps) {
-  // Detect format: v1 has clauseText, v2 has empty clauseText with context fields
   const isLegacyFormat = !!clause?.clauseText && clause.clauseText.length > 0;
   const hasFormatted = !!clause?.clauseTextFormatted;
   const hasExcerpts = !!clause?.findings.some((f) => f.excerpt);
@@ -71,74 +86,57 @@ export function ClauseText({
     trackedChangesCount: trackedChanges?.length,
     usingEffectiveText: !!effectiveText
   });
-  
-  // T048: Edit mode state
+
   const [editedText, setEditedText] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Initialize edited text when entering edit mode
+
   useEffect(() => {
     if (isEditMode && clause) {
       setEditedText(effectiveText || clause.clauseText || "");
     }
   }, [isEditMode, clause, effectiveText]);
-  
-  // T050: Handle save edit
-  // T020c: Pass findingId for manual edits (Feature 007)
+
   const handleSaveEdit = async () => {
     if (!clause || !editedText.trim()) {
       toast.error("Please enter some text");
       return;
     }
-    
     if (!editingFindingId) {
       toast.error("No finding selected for editing");
       return;
     }
-    
     setIsSaving(true);
     try {
       const response = await fetch(`/api/clauses/${clause.id}/decisions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actionType: 'EDIT_MANUAL',
-          findingId: editingFindingId,  // T020c: Feature 007 - Required for all decisions
-          payload: {
-            replacementText: editedText.trim(),
-          },
+          actionType: "EDIT_MANUAL",
+          findingId: editingFindingId,
+          payload: { replacementText: editedText.trim() },
           clauseUpdatedAtWhenLoaded: new Date().toISOString(),
         }),
       });
-      
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to save edit');
+        throw new Error(error.error || "Failed to save edit");
       }
-      
       const data = await response.json();
-      
-      // Check for conflict warning
       if (data.conflictWarning) {
         toast.warning(data.conflictWarning.message, { duration: 8000 });
       } else {
-        toast.success('Manual edit saved');
+        toast.success("Manual edit saved");
       }
-      
-      // Exit edit mode
       onEditModeChange?.(false);
-      
-      // Trigger parent refresh
       onDecisionApplied?.();
     } catch (error) {
-      console.error('Error saving manual edit:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save edit');
+      console.error("Error saving manual edit:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save edit");
     } finally {
       setIsSaving(false);
     }
   };
-  
-  // T051: Handle cancel edit
+
   const handleCancelEdit = () => {
     setEditedText("");
     onEditModeChange?.(false);
@@ -146,9 +144,11 @@ export function ClauseText({
 
   if (!clause) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
-        <FileText className="h-8 w-8" />
-        <p className="text-sm">Select a clause to view its text</p>
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <div className="w-12 h-12 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
+          <FileText className="h-5 w-5 opacity-40" />
+        </div>
+        <p className="text-sm text-muted-foreground/60">Select a clause to review</p>
       </div>
     );
   }
@@ -167,46 +167,78 @@ export function ClauseText({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* ── Header ── */}
       <div className="px-6 py-4 border-b bg-card shrink-0">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Badge variant="outline" className="text-xs font-mono shrink-0">
-              {clause.clauseNumber ? `§${clause.clauseNumber}` : `#${clause.position}`}
-            </Badge>
-            <h2 className="text-sm font-semibold text-foreground">{clause.clauseName}</h2>
-            
-            {/* T024: Effective Status Badge (Feature 007 - DerivedClauseStatus) */}
-            {effectiveStatus && effectiveStatus !== 'DEVIATION_DETECTED' && effectiveStatus !== 'NO_DEVIATION' && effectiveStatus !== 'PENDING' && (
-              <Badge 
-                variant="secondary"
-                className={cn(
-                  "text-xs shrink-0",
-                  effectiveStatus === 'RESOLVED' && "bg-green-100 text-green-800 border-green-300",
-                  effectiveStatus === 'PARTIALLY_RESOLVED' && "bg-blue-100 text-blue-800 border-blue-300",
-                  effectiveStatus === 'ESCALATED' && "bg-yellow-100 text-yellow-800 border-yellow-300",
-                  effectiveStatus === 'NO_ISSUES' && "bg-green-100 text-green-800 border-green-300"
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 flex-wrap min-w-0">
+            {/* Clause number — monospace legal style */}
+            <span className="mt-0.5 shrink-0 text-[11px] font-mono font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border/60">
+              {clause.clauseNumber ? `§\u2009${clause.clauseNumber}` : `#${clause.position}`}
+            </span>
+
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <h2 className="text-sm font-semibold text-foreground leading-snug">
+                {clause.clauseName}
+              </h2>
+
+              {/* Status badges row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {effectiveStatus &&
+                  effectiveStatus !== "DEVIATION_DETECTED" &&
+                  effectiveStatus !== "NO_DEVIATION" &&
+                  effectiveStatus !== "PENDING" && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border",
+                        effectiveStatus === "RESOLVED" &&
+                          "bg-green-50 text-green-700 border-green-200",
+                        effectiveStatus === "PARTIALLY_RESOLVED" &&
+                          "bg-blue-50 text-blue-700 border-blue-200",
+                        effectiveStatus === "ESCALATED" &&
+                          "bg-amber-50 text-amber-700 border-amber-200",
+                        effectiveStatus === "NO_ISSUES" &&
+                          "bg-green-50 text-green-700 border-green-200"
+                      )}
+                    >
+                      {effectiveStatus === "RESOLVED" && (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                      {effectiveStatus === "RESOLVED" && "Resolved"}
+                      {effectiveStatus === "PARTIALLY_RESOLVED" && "Partially Resolved"}
+                      {effectiveStatus === "ESCALATED" && "Escalated"}
+                      {effectiveStatus === "NO_ISSUES" && "No Issues"}
+                    </span>
+                  )}
+
+                {effectiveStatus === "ESCALATED" && escalatedToUserName && (
+                  <span className="text-[10px] text-muted-foreground">
+                    awaiting {escalatedToUserName}
+                  </span>
                 )}
-              >
-                {effectiveStatus === 'RESOLVED' && '✓ Resolved'}
-                {effectiveStatus === 'PARTIALLY_RESOLVED' && 'Partially Resolved'}
-                {effectiveStatus === 'ESCALATED' && 'Escalated'}
-                {effectiveStatus === 'NO_ISSUES' && 'No Issues'}
-              </Badge>
-            )}
-            
-            {/* T059: Show assignee name for escalated clauses */}
-            {effectiveStatus === 'ESCALATED' && escalatedToUserName && (
-              <span className="text-xs text-muted-foreground italic">
-                (awaiting {escalatedToUserName})
-              </span>
-            )}
+
+                {hasTrackedChanges && !isEditMode && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+                    <GitMerge className="h-3 w-3" />
+                    Changes applied
+                  </span>
+                )}
+
+                {isEditMode && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    <Pencil className="h-3 w-3" />
+                    Editing
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
+
           {showToggle && (
-            <div className="flex items-center gap-1 border rounded-md p-0.5">
+            <div className="shrink-0 flex items-center gap-0.5 border rounded-lg p-0.5 bg-muted/40">
               <Button
                 size="sm"
                 variant={viewMode === "formatted" ? "secondary" : "ghost"}
-                className="h-6 px-2 text-[10px] gap-1"
+                className="h-6 px-2 text-[10px] gap-1 rounded-md"
                 onClick={() => setViewMode("formatted")}
               >
                 <BookOpen className="h-3 w-3" />
@@ -215,7 +247,7 @@ export function ClauseText({
               <Button
                 size="sm"
                 variant={viewMode === "highlights" ? "secondary" : "ghost"}
-                className="h-6 px-2 text-[10px] gap-1"
+                className="h-6 px-2 text-[10px] gap-1 rounded-md"
                 onClick={() => setViewMode("highlights")}
               >
                 <Highlighter className="h-3 w-3" />
@@ -225,98 +257,79 @@ export function ClauseText({
           )}
         </div>
       </div>
+
+      {/* ── Body ── */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-6 py-5 space-y-6">
-          {/* T060: Locked State UI - Show when clause is escalated */}
+        <div className="px-6 py-5 space-y-5">
+
+          {/* Escalation warning */}
           {hasUnresolvedEscalation && escalatedToUserName && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-yellow-900">
-                    Awaiting decision from {escalatedToUserName}
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    This clause has been escalated. Only the assigned approver or an admin can make decisions.
-                  </p>
-                </div>
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Awaiting {escalatedToUserName}
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Only the assigned approver or an admin can make decisions on this clause.
+                </p>
               </div>
             </div>
           )}
 
-          {/* T048: Inline Editor Mode */}
           {isEditMode ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Edit Clause Text
-                </h3>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              
+            // ── In-place editor ──
+            <div className="space-y-3">
               <Textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                placeholder="Enter custom clause text..."
-                className="min-h-[300px] text-sm leading-7 font-legal resize-none"
+                placeholder="Enter custom clause text…"
+                className="min-h-[280px] text-sm leading-7 font-legal resize-none bg-amber-50/40 border-amber-200 focus-visible:ring-1 focus-visible:ring-amber-400 placeholder:text-muted-foreground/40"
                 autoFocus
               />
-              
               <div className="flex items-center gap-2">
                 <Button
                   onClick={handleSaveEdit}
                   disabled={isSaving || !editedText.trim()}
                   size="sm"
-                  className="gap-2"
+                  className="gap-1.5 h-8"
                 >
-                  <Save className="h-4 w-4" />
-                  {isSaving ? 'Saving...' : 'Save Edit'}
+                  <Save className="h-3.5 w-3.5" />
+                  {isSaving ? "Saving…" : "Save"}
                 </Button>
                 <Button
                   onClick={handleCancelEdit}
                   disabled={isSaving}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="gap-2"
+                  className="gap-1.5 h-8 text-muted-foreground"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                   Cancel
                 </Button>
               </div>
-              
-              <p className="text-xs text-muted-foreground">
-                Your changes will be saved and tracked. The original clause text will be preserved in the decision history.
-              </p>
             </div>
           ) : (
             <>
-              {/* T036: Display tracked changes if present (Feature 006) */}
-              {hasTrackedChanges && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Tracked Changes
-                    </h3>
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-md border">
-                    <TrackedChangesDisplay changes={trackedChanges!} />
-                  </div>
-                </div>
-              )}
-
-              {/* Clause text - use effectiveText if available (from decisions), otherwise original text */}
+              {/* Original clause text — always shown as-is */}
               {isLegacyFormat ? (
-                // Format v1: Show full clause text with optional highlighting
                 viewMode === "formatted" && hasFormatted ? (
-                  <MarkdownViewer content={effectiveText || clause.clauseTextFormatted || clause.clauseText} />
+                  <MarkdownViewer content={clause.clauseTextFormatted || clause.clauseText} />
                 ) : (
-                  <ClauseTextWithHighlights text={effectiveText || clause.clauseText} excerpts={excerpts} />
+                  <ClauseTextWithHighlights text={clause.clauseText} excerpts={excerpts} />
                 )
               ) : (
-                // Format v2: Show findings with excerpt + context
-                <DeviationFocusedView findings={clause.findings} />
+                <DeviationFocusedView
+                  findings={clause.findings}
+                  findingStatuses={findingStatuses}
+                  clauseId={clause.id}
+                  editingFindingId={editingFindingId}
+                  onDecisionApplied={onDecisionApplied}
+                  onProjectionUpdate={onProjectionUpdate}
+                  onCancelEdit={() => onEditModeChange?.(false)}
+                />
               )}
+
             </>
           )}
         </div>
@@ -325,86 +338,263 @@ export function ClauseText({
   );
 }
 
-// Format v2: Deviation-focused view with excerpts + context
-function DeviationFocusedView({ findings }: { findings: Finding[] }) {
+// ── Format v2: Deviation-focused view ───────────────────────────────────────
+
+function DeviationFocusedView({
+  findings,
+  findingStatuses,
+  clauseId,
+  editingFindingId,
+  onDecisionApplied,
+  onProjectionUpdate,
+  onCancelEdit,
+}: {
+  findings: Finding[];
+  findingStatuses?: Record<string, FindingStatusEntry>;
+  clauseId?: string;
+  editingFindingId?: string | null;
+  onDecisionApplied?: () => void;
+  onProjectionUpdate?: (projection: ProjectionResult) => void;
+  onCancelEdit?: () => void;
+}) {
+  const [editText, setEditText] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  // Initialise editor text when a finding is opened for editing
+  useEffect(() => {
+    if (editingFindingId) {
+      const finding = findings.find((f) => f.id === editingFindingId);
+      if (finding && !editText[editingFindingId]) {
+        setEditText((prev) => ({ ...prev, [editingFindingId]: finding.excerpt || "" }));
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingFindingId]);
+
+  const handleSave = async (findingId: string) => {
+    if (!clauseId) return;
+    const text = editText[findingId]?.trim();
+    if (!text) {
+      toast.error("Please enter replacement text");
+      return;
+    }
+    setSaving(findingId);
+    try {
+      const res = await fetch(`/api/clauses/${clauseId}/decisions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "EDIT_MANUAL",
+          findingId,
+          payload: { replacementText: text },
+          clauseUpdatedAtWhenLoaded: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || "Failed to save edit");
+        return;
+      }
+      const data = await res.json();
+      if (data.conflictWarning) {
+        toast.warning(data.conflictWarning.message, { duration: 8000 });
+      } else {
+        toast.success("Edit saved");
+      }
+      // Apply fresh projection immediately from response — no separate GET needed
+      if (data.projection) {
+        onProjectionUpdate?.(data.projection);
+      }
+      onDecisionApplied?.();
+      onCancelEdit?.();
+    } catch {
+      toast.error("Failed to save edit");
+    } finally {
+      setSaving(null);
+    }
+  };
+
   if (findings.length === 0) {
     return (
-      <div className="text-sm text-muted-foreground italic">
-        No findings for this clause
-      </div>
+      <p className="text-sm text-muted-foreground/60 italic">No findings for this clause.</p>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {findings.map((finding) => (
-        <div key={finding.id} className="space-y-2">
-          {/* Location badge */}
-          {finding.locationPage && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>
-                Page {finding.locationPage}
-                {finding.locationPosition && ` (${finding.locationPosition})`}
+    <div className="space-y-7">
+      {findings.map((finding, idx) => {
+        const fStatus = findingStatuses?.[finding.id];
+        const isResolved =
+          fStatus?.status === "RESOLVED_APPLIED_FALLBACK" ||
+          fStatus?.status === "RESOLVED_MANUAL_EDIT";
+        const isEditing = editingFindingId === finding.id;
+        const appliedText = fStatus?.replacementText ?? null;
+
+        return (
+          <div key={finding.id} className="space-y-2.5">
+            {/* Finding index + location row */}
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="font-mono font-semibold text-muted-foreground/50">
+                {String(idx + 1).padStart(2, "0")}
               </span>
+              <span className="w-px h-3 bg-border" />
+              {finding.locationPage ? (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Page {finding.locationPage}
+                  {finding.locationPosition && ` · ${finding.locationPosition}`}
+                </span>
+              ) : (
+                <span className="italic opacity-50">Location unknown</span>
+              )}
             </div>
-          )}
 
-          {/* Context before (muted) */}
-          {finding.contextBefore && (
-            <p className="text-sm leading-6 text-muted-foreground italic">
-              ...{finding.contextBefore}
-            </p>
-          )}
-
-          {/* Excerpt (highlighted) */}
-          <div
-            className={cn(
-              "rounded-md px-4 py-3 border-l-4",
-              finding.riskLevel === "RED"
-                ? "bg-risk-red-soft border-risk-red"
-                : finding.riskLevel === "YELLOW"
-                ? "bg-risk-yellow-soft border-risk-yellow"
-                : "bg-risk-green-soft border-risk-green"
+            {/* Context before */}
+            {finding.contextBefore && (
+              <p className="text-xs leading-5 text-muted-foreground/70 pl-2 border-l border-border/50 italic">
+                …{finding.contextBefore}
+              </p>
             )}
-          >
-            <p className="text-sm leading-6 font-medium text-foreground">
-              {finding.excerpt}
-            </p>
-          </div>
 
-          {/* Context after (muted) */}
-          {finding.contextAfter && (
-            <p className="text-sm leading-6 text-muted-foreground italic">
-              {finding.contextAfter}...
-            </p>
-          )}
-
-          {/* Finding details */}
-          <div className="flex items-start gap-2 pt-1">
-            <Badge
-              variant="outline"
+            {/* Excerpt block */}
+            <div
               className={cn(
-                "shrink-0 text-xs",
+                "rounded-md px-4 py-3 border-l-4",
                 finding.riskLevel === "RED"
-                  ? "bg-risk-red-soft text-risk-red border-risk-red-border"
+                  ? "bg-risk-red-soft border-risk-red"
                   : finding.riskLevel === "YELLOW"
-                  ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border"
-                  : "bg-risk-green-soft text-risk-green border-risk-green-border"
+                  ? "bg-risk-yellow-soft border-risk-yellow"
+                  : "bg-risk-green-soft border-risk-green"
               )}
             >
-              {riskLabel[finding.riskLevel]}
-            </Badge>
-            <div className="flex-1 space-y-1">
-              <p className="text-xs font-medium text-foreground">{finding.summary}</p>
-              <p className="text-[10px] text-muted-foreground">{finding.matchedRuleTitle}</p>
+              <p
+                className={cn(
+                  "text-sm leading-6 font-medium",
+                  isResolved
+                    ? "line-through text-muted-foreground decoration-1"
+                    : "text-foreground"
+                )}
+              >
+                {finding.excerpt}
+              </p>
             </div>
+
+            {/* Applied language — shown once fallback or manual edit is applied */}
+            {isResolved && appliedText && (
+              <div className="flex items-start gap-2 pl-1">
+                <div className="shrink-0 flex flex-col items-center pt-1 gap-0.5">
+                  <span className="w-px h-3 bg-green-300" />
+                  <ArrowDown className="h-3 w-3 text-green-500" />
+                </div>
+                <div className="flex-1 rounded-md px-4 py-3 border-l-4 border-green-500 bg-green-50">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-green-600 mb-1.5">
+                    Applied language
+                  </p>
+                  <p className="text-sm leading-6 font-medium text-green-900">
+                    {appliedText}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Inline editor — shown when this finding is being edited */}
+            {isEditing && !isResolved && (
+              <div className="space-y-2 pl-1">
+                <div className="shrink-0 flex flex-col items-center gap-0.5 w-4">
+                  <span className="w-px h-3 bg-amber-300" />
+                  <ArrowDown className="h-3 w-3 text-amber-500" />
+                </div>
+                <div className="border border-amber-300 rounded-md bg-amber-50/40 p-3 space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600">
+                    Replacement text
+                  </p>
+                  <Textarea
+                    value={editText[finding.id] ?? ""}
+                    onChange={(e) =>
+                      setEditText((prev) => ({ ...prev, [finding.id]: e.target.value }))
+                    }
+                    placeholder="Enter replacement language…"
+                    className="min-h-[100px] text-sm leading-6 resize-none bg-white border-amber-200 focus-visible:ring-1 focus-visible:ring-amber-400 placeholder:text-muted-foreground/40"
+                  />
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      className="h-7 text-[11px] gap-1"
+                      disabled={saving === finding.id || !editText[finding.id]?.trim()}
+                      onClick={() => handleSave(finding.id)}
+                    >
+                      {saving === finding.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="h-3 w-3" />
+                      )}
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-[11px] gap-1 text-muted-foreground"
+                      disabled={saving === finding.id}
+                      onClick={onCancelEdit}
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Context after */}
+            {finding.contextAfter && (
+              <p className="text-xs leading-5 text-muted-foreground/70 pl-2 border-l border-border/50 italic">
+                {finding.contextAfter}…
+              </p>
+            )}
+
+            {/* Finding metadata */}
+            <div className="flex items-start gap-2.5 pt-0.5">
+              <span
+                className={cn(
+                  "shrink-0 mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                  finding.riskLevel === "RED"
+                    ? "bg-risk-red-soft text-risk-red border-risk-red-border"
+                    : finding.riskLevel === "YELLOW"
+                    ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border"
+                    : "bg-risk-green-soft text-risk-green border-risk-green-border"
+                )}
+              >
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    finding.riskLevel === "RED" ? "bg-risk-red" :
+                    finding.riskLevel === "YELLOW" ? "bg-risk-yellow" : "bg-risk-green"
+                  )}
+                />
+                {riskLabel[finding.riskLevel]}
+              </span>
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <p className="text-xs font-medium text-foreground leading-snug">
+                  {finding.summary}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {finding.matchedRuleTitle}
+                </p>
+              </div>
+            </div>
+
+            {/* Divider between findings */}
+            {idx < findings.length - 1 && (
+              <div className="pt-1 border-b border-dashed border-border/40" />
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
+// ── ClauseTextWithHighlights ─────────────────────────────────────────────────
 
 function ClauseTextWithHighlights({
   text,
@@ -417,7 +607,6 @@ function ClauseTextWithHighlights({
     return <p className="text-sm leading-7 text-foreground/90 font-legal">{text}</p>;
   }
 
-  // Build highlighted segments
   const segments: { content: string; excerpt?: (typeof excerpts)[0] }[] = [];
   let remaining = text;
 
@@ -451,17 +640,18 @@ function ClauseTextWithHighlights({
                   {seg.content}
                 </mark>
               </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                className="max-w-xs p-3 space-y-1.5"
-              >
+              <TooltipContent side="top" className="max-w-xs p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5">
-                  <span className={cn(
-                    "text-xs font-medium px-2.5 py-0.5 rounded-full border",
-                    seg.excerpt.risk === "RED" ? "bg-risk-red-soft text-risk-red border-risk-red-border" :
-                    seg.excerpt.risk === "YELLOW" ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border" :
-                    "bg-risk-green-soft text-risk-green border-risk-green-border"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2.5 py-0.5 rounded-full border",
+                      seg.excerpt.risk === "RED"
+                        ? "bg-risk-red-soft text-risk-red border-risk-red-border"
+                        : seg.excerpt.risk === "YELLOW"
+                        ? "bg-risk-yellow-soft text-risk-yellow border-risk-yellow-border"
+                        : "bg-risk-green-soft text-risk-green border-risk-green-border"
+                    )}
+                  >
                     {riskLabel[seg.excerpt.risk] ?? seg.excerpt.risk}
                   </span>
                   <span className="text-[10px] text-muted-foreground">{seg.excerpt.rule}</span>

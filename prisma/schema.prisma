@@ -111,6 +111,9 @@ model ContractAnalysis {
   formatVersion       Int               @default(1)  // 1 = old clause-based, 2 = new deviation-based
   totalClauses        Int               @default(0)  // Total clauses in document (v2 only)
 
+  // Feature 010: Collabora viewer — risk-level highlights baked into the DOCX
+  highlightsApplied   Boolean           @default(false)
+
   clauses           AnalysisClause[]
   negotiationItems  NegotiationItem[]
 }

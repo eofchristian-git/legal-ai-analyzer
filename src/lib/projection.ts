@@ -84,6 +84,7 @@ function replayFindingDecisions(
   const notes: Array<{ text: string; timestamp: Date; userName: string }> = [];
   let lastActionType: DecisionActionType | null = null;
   let lastActionTimestamp: Date | null = null;
+  let replacementText: string | null = null;
 
   for (const d of toReplay) {
     if (undoneIds.has(d.id) ||
@@ -99,21 +100,28 @@ function replayFindingDecisions(
         escalatedToName = null;
         escalationReason = null;
         escalationComment = null;
+        replacementText = null;
         break;
-      case DecisionActionType.APPLY_FALLBACK:
+      case DecisionActionType.APPLY_FALLBACK: {
+        const payload = d.payload as ApplyFallbackPayload;
         status = FindingStatusValue.RESOLVED_APPLIED_FALLBACK;
         escalatedTo = null;
         escalatedToName = null;
         escalationReason = null;
         escalationComment = null;
+        replacementText = payload.replacementText;
         break;
-      case DecisionActionType.EDIT_MANUAL:
+      }
+      case DecisionActionType.EDIT_MANUAL: {
+        const payload = d.payload as EditManualPayload;
         status = FindingStatusValue.RESOLVED_MANUAL_EDIT;
         escalatedTo = null;
         escalatedToName = null;
         escalationReason = null;
         escalationComment = null;
+        replacementText = payload.replacementText;
         break;
+      }
       case DecisionActionType.ESCALATE: {
         const payload = d.payload as EscalatePayload;
         status = FindingStatusValue.ESCALATED;
@@ -154,6 +162,7 @@ function replayFindingDecisions(
     notes,
     lastActionType,
     lastActionTimestamp,
+    replacementText,
   };
 }
 

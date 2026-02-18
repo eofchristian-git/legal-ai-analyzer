@@ -1,0 +1,177 @@
+# WOPI Host Endpoints — Collabora Online Integration
+# These endpoints implement the WOPI protocol for document access.
+# Reference: https://learn.microsoft.com/en-us/microsoft-365/cloud-storage-partner-program/rest/
+
+openapi: '3.0.3'
+info:
+  title: WOPI Host API — Legal AI Analyzer
+  version: '1.0.0'
+  description: |
+    WOPI (Web Application Open Platform Interface) endpoints that Collabora Online
+    calls to retrieve document metadata and contents.
+    
+    Authentication: Every request includes an `access_token` query parameter
+    containing a JWT signed with COLLABORA_JWT_SECRET.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: http://host.docker.internal:3000
+    description: Docker-internal (used by Collabora container)
+
+paths:
+  /api/wopi/files/{fileId}:
+    get:
+      operationId: checkFileInfo
+      summary: WOPI CheckFileInfo — Returns file metadata and permissions
+      description: |
+        Called by Collabora when loading a document. Returns metadata about the
+        file including name, size, permissions, and version information.
+        
+        This is the first WOPI call Collabora makes when opening a document.
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          description: Contract ID (used as the WOPI file identifier)
+          schema:
+            type: string
+        - name: access_token
+          in: query
+          required: true
+          description: JWT access token for authentication
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckFileInfoResponse'
+        '401':
+          description: Invalid or expired access token
+        '404':
+          description: File not found
+
+  /api/wopi/files/{fileId}/contents:
+    get:
+      operationId: getFile
+      summary: WOPI GetFile — Returns the raw document bytes
+      description: |
+        Called by Collabora to download the document content.
+        Returns the raw DOCX file bytes.
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          description: Contract ID
+          schema:
+            type: string
+        - name: access_token
+          in: query
+          required: true
+          description: JWT access token for authentication
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Raw file content
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Invalid or expired access token
+        '404':
+          description: File not found
+
+components:
+  schemas:
+    CheckFileInfoResponse:
+      type: object
+      required:
+        - BaseFileName
+        - Size
+        - Version
+        - UserCanWrite
+      properties:
+        BaseFileName:
+          type: string
+          description: The file name (e.g., "contract.docx")
+          example: "DORA Security Appendix.docx"
+        Size:
+          type: integer
+          format: int64
+          description: File size in bytes
+          example: 45000
+        Version:
+          type: string
+          description: |
+            Version string derived from Document.updatedAt timestamp.
+            Changes when the backend mutates the DOCX, forcing Collabora
+            to re-fetch the file.
+          example: "1708281234567"
+        OwnerId:
+          type: string
+          description: User ID of the file owner
+          example: "cml123abc"
+        UserId:
+          type: string
+          description: User ID of the current viewer (from access token)
+          example: "cml456def"
+        UserFriendlyName:
+          type: string
+          description: Display name of the current user
+          example: "Jane Legal"
+        
+        # ─── Permission Flags ─────────────────────────────────
+        UserCanWrite:
+          type: boolean
+          description: Always false — documents are read-only in the viewer
+          example: false
+        UserCanNotWriteRelative:
+          type: boolean
+          description: Prevents "Save As" — always true
+          example: true
+        UserCanRename:
+          type: boolean
+          description: Prevents renaming — always false
+          example: false
+        
+        # ─── UI Flags ────────────────────────────────────────
+        DisablePrint:
+          type: boolean
+          description: Whether to disable printing
+          example: false
+        DisableExport:
+          type: boolean
+          description: Whether to disable export/download
+          example: false
+        HidePrintOption:
+          type: boolean
+          description: Whether to hide the print menu option
+          example: false
+        HideExportOption:
+          type: boolean
+          description: Whether to hide the export menu option
+          example: false
+        HideSaveOption:
+          type: boolean
+          description: Hide save option (always true for read-only)
+          example: true
+        
+        # ─── PostMessage Flags ────────────────────────────────
+        PostMessageOrigin:
+          type: string
+          description: |
+            Origin URL of the host application. Collabora will only accept
+            postMessage commands from this origin.
+          example: "http://localhost:3000"
+        
+        # ─── Watermark (optional) ─────────────────────────────
+        WatermarkText:
+          type: string
+          description: Optional watermark text shown on the document
+          example: null

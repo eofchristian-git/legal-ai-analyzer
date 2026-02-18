@@ -1,0 +1,20 @@
+services:
+  collabora:
+    image: collabora/code:latest
+    container_name: collabora-code
+    ports:
+      - "9980:9980"
+    environment:
+      # Allow WOPI requests from our Next.js app (Docker-internal URL)
+      - "aliasgroup1=http://host.docker.internal:3000"
+      # IMPORTANT: must include the mapped port so Collabora constructs correct
+      # Worker script URLs and WebSocket URLs (ws://localhost:9980/cool/...)
+      - "server_name=localhost:9980"
+      # Disable SSL for local development (use reverse proxy with HTTPS in production)
+      - "extra_params=--o:ssl.enable=false --o:ssl.termination=false"
+      # Admin console credentials (http://localhost:9980/browser/dist/admin/admin.html)
+      - "username=${COLLABORA_ADMIN_USER:-admin}"
+      - "password=${COLLABORA_ADMIN_PASSWORD:-admin}"
+    cap_add:
+      - MKNOD
+    restart: unless-stopped

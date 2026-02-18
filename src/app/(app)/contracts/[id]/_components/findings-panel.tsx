@@ -50,6 +50,10 @@ interface FindingsPanelProps {
   onNoteClick?: (findingId: string) => void;
   currentUserId?: string;
   currentUserRole?: string;
+  /** Called after fallback is applied — carries data for viewer redline */
+  onFallbackApplied?: (data: { findingId: string; excerpt: string; replacementText: string }) => void;
+  /** Called after a fallback decision is undone — carries data to revert the DOCX redline */
+  onFallbackUndone?: (data: { findingId: string; excerpt: string; insertedText: string; riskLevel: string }) => void;
 }
 
 const severityOrder: Record<string, number> = { RED: 0, YELLOW: 1, GREEN: 2 };
@@ -81,6 +85,8 @@ export function FindingsPanel({
   onNoteClick,
   currentUserId,
   currentUserRole,
+  onFallbackApplied,
+  onFallbackUndone,
 }: FindingsPanelProps) {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [strategyOpen, setStrategyOpen] = useState(false);
@@ -202,6 +208,8 @@ export function FindingsPanel({
               onEscalateClick={onEscalateClick}
               onNoteClick={onNoteClick}
               onEditManualClick={onEditManualClick}
+              onFallbackApplied={onFallbackApplied}
+              onFallbackUndone={onFallbackUndone}
             />
           ))}
 
@@ -237,6 +245,8 @@ function FindingCard({
   onEscalateClick,
   onNoteClick,
   onEditManualClick,
+  onFallbackApplied,
+  onFallbackUndone,
 }: {
   finding: Finding;
   finalized: boolean;
@@ -255,6 +265,8 @@ function FindingCard({
   onEscalateClick?: (findingId: string) => void;
   onNoteClick?: (findingId: string) => void;
   onEditManualClick?: (findingId?: string) => void;
+  onFallbackApplied?: (data: { findingId: string; excerpt: string; replacementText: string }) => void;
+  onFallbackUndone?: (data: { findingId: string; excerpt: string; insertedText: string; riskLevel: string }) => void;
 }) {
   const Icon = riskIcon[finding.riskLevel as keyof typeof riskIcon] ?? AlertCircle;
 
@@ -333,6 +345,8 @@ function FindingCard({
           onEscalateClick={onEscalateClick}
           onNoteClick={onNoteClick}
           onEditManualClick={onEditManualClick ? () => onEditManualClick(finding.id) : undefined}
+          onFallbackApplied={onFallbackApplied}
+          onFallbackUndone={onFallbackUndone}
         />
       )}
     </div>

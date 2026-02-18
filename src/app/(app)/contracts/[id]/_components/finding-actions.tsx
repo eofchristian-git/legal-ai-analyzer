@@ -37,6 +37,10 @@ interface FindingActionsProps {
   onEscalateClick?: (findingId: string) => void;
   onNoteClick?: (findingId: string) => void;
   onEditManualClick?: (findingId: string) => void;
+  /** Called after a fallback is successfully applied — carries data for the viewer redline */
+  onFallbackApplied?: (data: { findingId: string; excerpt: string; replacementText: string }) => void;
+  /** Called after an APPLY_FALLBACK decision is undone — carries data to revert the DOCX redline */
+  onFallbackUndone?: (data: { findingId: string; excerpt: string; insertedText: string; riskLevel: string }) => void;
 }
 
 export function FindingActions({
@@ -51,6 +55,8 @@ export function FindingActions({
   onEscalateClick,
   onNoteClick,
   onEditManualClick,
+  onFallbackApplied,
+  onFallbackUndone,
 }: FindingActionsProps) {
   const [loading, setLoading] = useState<string | null>(null); // tracks which action is loading
 
@@ -111,13 +117,21 @@ export function FindingActions({
   }, [postDecision]);
 
   const handleApplyFallback = useCallback(async () => {
-    await postDecision("APPLY_FALLBACK", {
+    const result = await postDecision("APPLY_FALLBACK", {
       replacementText: finding.fallbackText,
       source: "fallback",
       playbookRuleId: finding.id,
     });
-    toast.success("Fallback applied");
-  }, [postDecision, finding.fallbackText, finding.id]);
+    if (result) {
+      toast.success("Fallback applied");
+      // Notify parent so the viewer can apply the redline in the document
+      onFallbackApplied?.({
+        findingId: finding.id,
+        excerpt: finding.excerpt,
+        replacementText: finding.fallbackText,
+      });
+    }
+  }, [postDecision, finding.fallbackText, finding.id, finding.excerpt, onFallbackApplied]);
 
   const handleUndo = useCallback(async () => {
     // Fetch decision history for this clause, find last active decision for this finding
@@ -159,14 +173,49 @@ export function FindingActions({
       }
 
       const lastActive = activeDecs[activeDecs.length - 1];
-      await postDecision("UNDO", { undoneDecisionId: lastActive.id });
+      console.log("[FindingActions] Undoing decision:", {
+        decisionId: lastActive.id,
+        actionType: lastActive.actionType,
+        hasReplacementText: !!lastActive.payload?.replacementText,
+      });
+
+      const result = await postDecision("UNDO", { undoneDecisionId: lastActive.id });
+      if (!result) {
+        // postDecision already showed error toast
+        return;
+      }
       toast.success("Decision undone");
+
+      // If the undone decision was a fallback, notify parent to revert the DOCX redline
+      if (
+        lastActive.actionType === "APPLY_FALLBACK" &&
+        lastActive.payload?.replacementText
+      ) {
+        console.log("[FindingActions] Detected APPLY_FALLBACK undo → firing onFallbackUndone", {
+          findingId: finding.id,
+          excerptLen: finding.excerpt?.length,
+          insertedTextLen: lastActive.payload.replacementText?.length,
+          riskLevel: finding.riskLevel,
+          hasCallback: !!onFallbackUndone,
+        });
+        onFallbackUndone?.({
+          findingId: finding.id,
+          excerpt: finding.excerpt,
+          insertedText: lastActive.payload.replacementText,
+          riskLevel: finding.riskLevel,
+        });
+      } else {
+        console.log("[FindingActions] Undone decision was NOT APPLY_FALLBACK or no replacementText:", {
+          actionType: lastActive.actionType,
+          payload: lastActive.payload,
+        });
+      }
     } catch {
       toast.error("Failed to undo");
     } finally {
       setLoading(null);
     }
-  }, [clauseId, finding.id, postDecision]);
+  }, [clauseId, finding.id, finding.excerpt, finding.riskLevel, postDecision, onFallbackUndone]);
 
   const handleRevert = useCallback(async () => {
     await postDecision("REVERT", {});

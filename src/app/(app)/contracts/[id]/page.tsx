@@ -37,10 +37,12 @@ import { ActivityTimeline } from "./_components/activity-timeline";
 import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
 import { OnlyOfficeDocumentViewer } from "./_components/onlyoffice-viewer/onlyoffice-document-viewer";
+import { CollaboraDocumentViewer } from "./_components/collabora-viewer";
 import { RedlineExportModal } from "./_components/redline-export-modal";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
 import type { TrackChangeData } from "@/types/onlyoffice";
+import type { ClauseNavigationData, FindingRedlineData, FindingUndoRedlineData } from "@/types/collabora";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -70,9 +72,15 @@ export default function ContractDetailPage() {
     totalFindingCount: number;
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>>({});
-  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'onlyoffice'>('clause');
+  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'onlyoffice' | 'collabora'>('clause');
   // Tracked changes from APPLY_FALLBACK / EDIT_MANUAL decisions for ONLYOFFICE viewer
   const [onlyOfficeTrackChanges, setOnlyOfficeTrackChanges] = useState<TrackChangeData[]>([]);
+  // Collabora reload trigger — increment to force viewer reload after backend DOCX mutation
+  const [collaboraReloadTrigger, setCollaboraReloadTrigger] = useState(0);
+  // Collabora pending redline — set when user applies fallback, cleared after viewer applies it
+  const [pendingRedline, setPendingRedline] = useState<FindingRedlineData | null>(null);
+  // Collabora pending undo redline — set when user undoes a fallback, cleared after viewer reverts it
+  const [pendingUndoRedline, setPendingUndoRedline] = useState<FindingUndoRedlineData | null>(null);
   // T043: Redline export modal state
   const [redlineExportOpen, setRedlineExportOpen] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
@@ -592,9 +600,9 @@ export default function ContractDetailPage() {
                           Clause View
                         </Button>
                         <Button
-                          variant={documentViewMode === 'onlyoffice' ? 'default' : 'outline'}
+                          variant={documentViewMode === 'collabora' ? 'default' : 'outline'}
                           size="sm"
-                          onClick={() => setDocumentViewMode('onlyoffice')}
+                          onClick={() => setDocumentViewMode('collabora')}
                         >
                           Document View
                         </Button>
@@ -602,28 +610,59 @@ export default function ContractDetailPage() {
                     )}
                     
                     {/* Render based on view mode */}
-                    {documentViewMode === 'onlyoffice' ? (
-                      <OnlyOfficeDocumentViewer
+                    {documentViewMode === 'collabora' ? (
+                      <CollaboraDocumentViewer
                         contractId={contract.id}
                         contractTitle={contract.title}
                         fileType={contract.document?.filename?.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
-                        mode={isFinalized ? 'view' : 'edit'}
-                        onDocumentReady={() => console.log('[ONLYOFFICE] Document ready in viewer')}
-                        onError={(error) => console.error('[ONLYOFFICE] Viewer error:', error)}
+                        onDocumentReady={() => console.log('[Collabora] Document ready in viewer')}
+                        onError={(error) => console.error('[Collabora] Viewer error:', error)}
                         selectedClauseId={selectedClauseId}
-                        trackChanges={onlyOfficeTrackChanges}
-                        findings={
-                          contract.analysis?.clauses.flatMap((clause) =>
-                            clause.findings.map((f) => ({
-                              findingId: f.id,
-                              clauseId: clause.id,
-                              riskLevel: f.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
-                              matchedRuleTitle: f.matchedRuleTitle,
-                              summary: f.summary,
-                              excerpt: f.excerpt,
-                            }))
-                          ) ?? []
+                        clauses={
+                          (contract.analysis?.clauses.map((clause) => ({
+                            id: clause.id,
+                            clauseName: clause.clauseName || '',
+                            clauseText: clause.clauseText || '',
+                            position: clause.position ?? 0,
+                            // For formatVersion=2 contracts, clauseText is empty — pass finding excerpts as fallback
+                            findingExcerpts: clause.findings
+                              ?.map((f: { excerpt?: string }) => f.excerpt || '')
+                              .filter((e: string) => e.length > 0),
+                            // Per-finding data for in-document risk-level highlighting
+                            findingDetails: clause.findings
+                              ?.filter((f: { excerpt?: string }) => f.excerpt && f.excerpt.length > 0)
+                              .map((f: { id: string; excerpt?: string; riskLevel: string }) => ({
+                                id: f.id,
+                                excerpt: f.excerpt || '',
+                                riskLevel: f.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
+                              })),
+                          })) ?? []) as ClauseNavigationData[]
                         }
+                        reloadTrigger={collaboraReloadTrigger}
+                        pendingRedline={pendingRedline}
+                        onRedlineApplied={() => setPendingRedline(null)}
+                        pendingUndoRedline={pendingUndoRedline}
+                        onUndoRedlineApplied={() => setPendingUndoRedline(null)}
+                        highlightsApplied={contract.analysis?.highlightsApplied ?? false}
+                        onHighlightingComplete={async () => {
+                          // Persist the flag so next load skips highlighting
+                          try {
+                            await fetch(`/api/contracts/${contract.id}/highlights-applied`, {
+                              method: 'POST',
+                            });
+                            // Update local state so re-renders don't re-trigger
+                            setContract((prev) => {
+                              if (!prev?.analysis) return prev;
+                              return {
+                                ...prev,
+                                analysis: { ...prev.analysis, highlightsApplied: true },
+                              };
+                            });
+                            console.log('[Collabora] Highlights saved and flag persisted');
+                          } catch (err) {
+                            console.error('[Collabora] Failed to persist highlights flag:', err);
+                          }
+                        }}
                       />
                     ) : (
                       <ClauseText 
@@ -632,7 +671,10 @@ export default function ContractDetailPage() {
                         trackedChanges={projection?.trackedChanges}
                         isEditMode={isEditMode}
                       effectiveText={projection?.effectiveText}
-                      onEditModeChange={setIsEditMode}
+                      onEditModeChange={(mode) => {
+                        setIsEditMode(mode);
+                        if (!mode) setEditingFindingId(null);
+                      }}
                       onDecisionApplied={() => {
                         loadContract();
                         setHistoryRefreshKey((k) => k + 1);
@@ -641,6 +683,20 @@ export default function ContractDetailPage() {
                       escalatedToUserName={projection?.escalatedToUserName}
                       hasUnresolvedEscalation={projection?.hasUnresolvedEscalation}
                       editingFindingId={editingFindingId}
+                      findingStatuses={projection?.findingStatuses}
+                      onProjectionUpdate={(proj) => {
+                        setProjection(proj);
+                        if (selectedClauseId) {
+                          setClauseProjections((prev) => ({
+                            ...prev,
+                            [selectedClauseId]: {
+                              resolvedCount: proj.resolvedCount || 0,
+                              totalFindingCount: proj.totalFindingCount || 0,
+                              effectiveStatus: proj.effectiveStatus || "PENDING",
+                            },
+                          }));
+                        }
+                      }}
                     />
                     )}
                   </div>
@@ -667,7 +723,6 @@ export default function ContractDetailPage() {
                       historyRefreshKey={historyRefreshKey}
                       onEditManualClick={(findingId) => {
                         setEditingFindingId(findingId ?? null);
-                        setIsEditMode(true);
                       }}
                       onEscalateClick={(findingId) => {
                         setActiveModalFindingId(findingId);
@@ -679,6 +734,32 @@ export default function ContractDetailPage() {
                       }}
                       currentUserId={session?.user?.id}
                       currentUserRole={session?.user?.role}
+                      onFallbackApplied={(data) => {
+                        // When in Collabora viewer mode, apply the redline visually
+                        if (documentViewMode === 'collabora') {
+                          setPendingRedline(data);
+                        }
+                      }}
+                      onFallbackUndone={(data) => {
+                        console.log("[Page] onFallbackUndone received:", {
+                          findingId: data.findingId,
+                          excerptLen: data.excerpt?.length,
+                          insertedTextLen: data.insertedText?.length,
+                          riskLevel: data.riskLevel,
+                          documentViewMode,
+                        });
+                        // When in Collabora viewer mode, revert the redline visually
+                        if (documentViewMode === 'collabora') {
+                          const undoData = {
+                            findingId: data.findingId,
+                            excerpt: data.excerpt,
+                            insertedText: data.insertedText,
+                            riskLevel: data.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
+                          };
+                          console.log("[Page] Setting pendingUndoRedline:", undoData);
+                          setPendingUndoRedline(undoData);
+                        }
+                      }}
                     />
                   </div>
                 </ResizablePanel>

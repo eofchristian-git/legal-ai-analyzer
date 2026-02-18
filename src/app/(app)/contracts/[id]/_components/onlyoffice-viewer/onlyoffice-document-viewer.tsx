@@ -12,6 +12,7 @@ import { Loader2, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SessionManager } from "./session-manager";
 import { FindingComments } from "./finding-comments";
+import { FindingHighlights } from "./finding-highlights";
 import { TrackedChanges } from "./tracked-changes";
 import type { TokenResponse, OnlyOfficeViewerProps, FindingCommentData, TrackChangeData } from "@/types/onlyoffice";
 
@@ -253,6 +254,23 @@ export function OnlyOfficeDocumentViewer({
           height="100%"
           width="100%"
         />
+
+        {/* Toolbar — floats over the bottom-right corner of the document */}
+        {(findings.length > 0 || trackChanges.length > 0) && (
+          <div className="absolute bottom-3 right-3 flex gap-2 z-10">
+            <FindingHighlights
+              connector={connector}
+              findings={findings}
+              documentReady={documentReady}
+            />
+            <TrackedChanges
+              connector={connector}
+              changes={trackChanges}
+              documentReady={documentReady}
+              showToggle={true}
+            />
+          </div>
+        )}
       </div>
 
       {/* Session Manager — handles automatic token refresh */}
@@ -263,7 +281,7 @@ export function OnlyOfficeDocumentViewer({
         onRefreshError={handleRefreshError}
       />
 
-      {/* Finding Comments — injects findings as ONLYOFFICE comments */}
+      {/* Finding Comments — injects findings as ONLYOFFICE comments (for navigation) */}
       {findings.length > 0 && (
         <FindingComments
           connector={connector}
@@ -275,16 +293,6 @@ export function OnlyOfficeDocumentViewer({
             const success = results.filter((r) => r.success).length;
             console.log(`[ONLYOFFICE] ${success}/${results.length} finding comments injected`);
           }}
-        />
-      )}
-
-      {/* Track Changes — displays triage decisions as tracked changes */}
-      {trackChanges.length > 0 && (
-        <TrackedChanges
-          connector={connector}
-          changes={trackChanges}
-          documentReady={documentReady}
-          showToggle={true}
         />
       )}
     </div>
