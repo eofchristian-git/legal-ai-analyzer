@@ -75,9 +75,22 @@ export interface ONLYOFFICEReviewConfig {
 }
 
 export interface ONLYOFFICECustomizationConfig {
-  comments: boolean;
-  compactToolbar: boolean;
-  review: ONLYOFFICEReviewConfig;
+  autosave?: boolean;
+  chat?: boolean;
+  comments?: boolean;
+  compactHeader?: boolean;
+  compactToolbar?: boolean;
+  feedback?: boolean | { visible: boolean };
+  forcesave?: boolean;
+  goback?: boolean | { url: string };
+  help?: boolean;
+  hideRightMenu?: boolean;
+  hideRulers?: boolean;
+  plugins?: boolean;
+  toolbarHideFileName?: boolean;
+  toolbarNoTabs?: boolean;
+  review?: ONLYOFFICEReviewConfig;
+  logo?: { image?: string; imageEmbedded?: string; url?: string; visible?: boolean };
 }
 
 export interface ONLYOFFICEEditorConfig {
@@ -89,6 +102,7 @@ export interface ONLYOFFICEEditorConfig {
 }
 
 export interface ONLYOFFICEConfig {
+  type?: 'desktop' | 'mobile' | 'embedded';
   document: ONLYOFFICEDocumentConfig;
   documentType: string;
   editorConfig: ONLYOFFICEEditorConfig;

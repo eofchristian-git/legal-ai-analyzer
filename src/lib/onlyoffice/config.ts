@@ -3,6 +3,7 @@
  * Feature 009: Centralized ONLYOFFICE configuration and defaults
  */
 
+import jwt from 'jsonwebtoken';
 import type { SessionMode, ONLYOFFICEConfig, ONLYOFFICEDocumentPermissions } from '@/types/onlyoffice';
 
 // ─── Environment Configuration ───────────────────────────────────────────────
@@ -29,6 +30,14 @@ export function isJwtEnabled(): boolean {
 
 export function getAppBaseUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
+
+/**
+ * Get the base URL that ONLYOFFICE Document Server (inside Docker) uses
+ * to reach our Next.js app. Falls back to host.docker.internal for local dev.
+ */
+export function getDockerAccessibleBaseUrl(): string {
+  return process.env.ONLYOFFICE_APP_CALLBACK_URL || 'http://host.docker.internal:3000';
 }
 
 // ─── Token Expiration Defaults ───────────────────────────────────────────────
@@ -67,11 +76,11 @@ export function validateDocumentKey(key: string, contractId: string): boolean {
 
 export function getPermissions(mode: SessionMode): ONLYOFFICEDocumentPermissions {
   return {
-    comment: true,
+    comment: true,    // Required for programmatically injected finding comments to display
     download: true,
-    edit: mode === 'edit',
+    edit: false,       // Always read-only — changes come from triage decisions only
     print: true,
-    review: mode === 'edit',
+    review: false,     // Track changes are injected, not manually created
   };
 }
 
@@ -99,23 +108,27 @@ export function buildOnlyOfficeConfig(options: BuildConfigOptions): ONLYOFFICECo
     mode,
     userId,
     userName,
-    accessToken,
   } = options;
 
   // Map MIME type to ONLYOFFICE file type
   const ooFileType = fileType === 'application/pdf' ? 'pdf' : 'docx';
 
-  return {
+  // Always use 'view' mode — document is read-only, changes come from triage decisions
+  const effectiveMode = 'view' as const;
+
+  // Build the config payload (without token)
+  const configPayload = {
+    type: 'embedded' as const, // Removes the top menu bar — shows document only
     document: {
       fileType: ooFileType,
       key: documentKey,
       title: contractTitle,
       url: downloadUrl,
-      permissions: getPermissions(mode),
+      permissions: getPermissions(effectiveMode),
     },
     documentType: 'word',
     editorConfig: {
-      mode,
+      mode: effectiveMode,
       lang: 'en',
       callbackUrl,
       user: {
@@ -123,27 +136,58 @@ export function buildOnlyOfficeConfig(options: BuildConfigOptions): ONLYOFFICECo
         name: userName,
       },
       customization: {
-        comments: true,
+        // ── Hide all ONLYOFFICE UI chrome — show only the document ──
+        autosave: false,
+        chat: false,
+        comments: true,   // Show comments panel so injected finding annotations are visible
+        compactHeader: true,
         compactToolbar: true,
+        feedback: false,
+        forcesave: false,
+        goback: false,
+        help: false,
+        hideRightMenu: false, // Must be false for comments sidebar to be accessible
+        hideRulers: true,
+        plugins: false,
+        toolbarHideFileName: true,
+        toolbarNoTabs: true,
+        logo: { visible: false },
         review: {
-          showReviewChanges: mode === 'edit',
-          trackChanges: mode === 'edit',
+          showReviewChanges: false,
+          trackChanges: false,
         },
       },
     },
-    token: accessToken,
+  };
+
+  // Sign the FULL config as JWT — ONLYOFFICE validates this token
+  // and expects the decoded payload to match the config structure
+  const secret = getOnlyOfficeJwtSecret();
+  const token = jwt.sign(configPayload, secret);
+
+  return {
+    ...configPayload,
+    token,
   };
 }
 
 // ─── URL Builders ────────────────────────────────────────────────────────────
 
+/**
+ * Build the document download URL that ONLYOFFICE server will use to fetch the file.
+ * Uses Docker-accessible URL since ONLYOFFICE runs inside a container.
+ */
 export function buildDownloadUrl(contractId: string, downloadToken: string): string {
-  const baseUrl = getAppBaseUrl();
+  const baseUrl = getDockerAccessibleBaseUrl();
   return `${baseUrl}/api/contracts/${contractId}/download?token=${downloadToken}`;
 }
 
+/**
+ * Build the callback URL that ONLYOFFICE server will call on document events.
+ * Uses Docker-accessible URL since ONLYOFFICE runs inside a container.
+ */
 export function buildCallbackUrl(contractId: string): string {
-  const baseUrl = getAppBaseUrl();
+  const baseUrl = getDockerAccessibleBaseUrl();
   return `${baseUrl}/api/onlyoffice/callback/${contractId}`;
 }
 

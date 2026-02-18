@@ -1,7 +1,6 @@
-version: '3'
 services:
   onlyoffice-documentserver:
-    image: onlyoffice/documentserver:7.5.1
+    image: onlyoffice/documentserver-ee:7.5.1
     container_name: onlyoffice-documentserver
     ports:
       - "8080:80"
@@ -14,6 +13,9 @@ services:
       - onlyoffice_data:/var/www/onlyoffice/Data
       - onlyoffice_logs:/var/log/onlyoffice
       - onlyoffice_cache:/var/lib/onlyoffice
+      # Place your ONLYOFFICE license file at docker/onlyoffice/license.lic
+      # and uncomment the line below to activate Developer/Enterprise Edition:
+      - ./license.lic:/var/www/onlyoffice/Data/license.lic:ro
     restart: unless-stopped
 
 volumes:

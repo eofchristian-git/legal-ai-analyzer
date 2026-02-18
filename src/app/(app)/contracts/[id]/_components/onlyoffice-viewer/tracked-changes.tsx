@@ -15,8 +15,11 @@ import {
   disableTrackChangesDisplay,
 } from "@/lib/onlyoffice/track-changes-injector";
 import type { TrackChangeData, TrackChangeInjectionResult } from "@/types/onlyoffice";
+import type { OOConnector } from "./onlyoffice-document-viewer";
 
 interface TrackedChangesProps {
+  /** Connector from the parent viewer (null on Community Edition) */
+  connector: OOConnector | null;
   /** Track change data computed from clause decisions */
   changes: TrackChangeData[];
   /** Whether the ONLYOFFICE document is ready for API calls */
@@ -28,6 +31,7 @@ interface TrackedChangesProps {
 }
 
 export function TrackedChanges({
+  connector,
   changes,
   documentReady,
   showToggle = true,
@@ -38,37 +42,23 @@ export function TrackedChanges({
   const [injecting, setInjecting] = useState(false);
   const [injected, setInjected] = useState(false);
 
-  // Get the ONLYOFFICE connector instance
-  const getConnector = useCallback(() => {
-    try {
-      const editorInstances = (window as unknown as Record<string, unknown>)?.DocEditor;
-      if (editorInstances && typeof editorInstances === 'object') {
-        const instances = (editorInstances as Record<string, unknown>)?.instances;
-        if (instances && typeof instances === 'object') {
-          return (instances as Record<string, { executeMethod: (method: string, args?: unknown[]) => Promise<void> }>)['onlyoffice-editor'];
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Inject tracked changes once document is ready
+  // Reset injection guard when the set of changes grows (new decision applied while viewer is open).
   useEffect(() => {
-    if (!documentReady || injectedRef.current || changes.length === 0) {
+    injectedRef.current = false;
+    setInjected(false);
+  }, [changes.length]);
+
+  // Inject tracked changes once document and connector are both ready
+  useEffect(() => {
+    if (!documentReady || !connector || injectedRef.current || changes.length === 0) {
       return;
     }
 
-    const inject = async () => {
-      const connector = getConnector();
-      if (!connector) {
-        console.warn("[TrackedChanges] ONLYOFFICE connector not available");
-        return;
-      }
+    injectedRef.current = true;
+    let cancelled = false;
 
+    const run = async () => {
       setInjecting(true);
-      injectedRef.current = true;
 
       console.log(`[TrackedChanges] Injecting ${changes.length} tracked changes...`);
       const startTime = Date.now();
@@ -81,19 +71,22 @@ export function TrackedChanges({
         `[TrackedChanges] Injection complete: ${successCount}/${changes.length} in ${elapsed}ms`
       );
 
-      setInjecting(false);
-      setInjected(true);
-      onInjectionComplete?.(results);
+      if (!cancelled) {
+        setInjecting(false);
+        setInjected(true);
+        onInjectionComplete?.(results);
+      }
     };
 
-    // Delay to ensure document is fully loaded + comments are injected
-    const timer = setTimeout(inject, 1500);
-    return () => clearTimeout(timer);
-  }, [documentReady, changes, getConnector, onInjectionComplete]);
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentReady, connector, changes, onInjectionComplete]);
 
   // Toggle track changes visibility
   const handleToggle = useCallback(async () => {
-    const connector = getConnector();
     if (!connector) return;
 
     const newVisible = !changesVisible;
@@ -104,9 +97,10 @@ export function TrackedChanges({
     } else {
       await disableTrackChangesDisplay(connector);
     }
-  }, [changesVisible, getConnector]);
+  }, [changesVisible, connector]);
 
-  if (!showToggle || changes.length === 0) {
+  // Hide button when no changes, connector unavailable, or toggle disabled
+  if (!showToggle || changes.length === 0 || !connector) {
     return null;
   }
 

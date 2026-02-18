@@ -84,7 +84,7 @@ export async function GET(
     const fileExtension = contract.document.fileType === 'application/pdf' ? 'pdf' : 'docx';
 
     // Return file as response
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': `inline; filename="${contract.title}.${fileExtension}"`,

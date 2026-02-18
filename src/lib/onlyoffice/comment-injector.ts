@@ -5,14 +5,9 @@
  */
 
 import type { FindingCommentData, CommentInjectionResult } from '@/types/onlyoffice';
+import type { OOConnector } from '@/app/(app)/contracts/[id]/_components/onlyoffice-viewer/onlyoffice-document-viewer';
 
-// ─── Risk Level Color Mapping ────────────────────────────────────────────────
-
-export const RISK_COLORS = {
-  RED: '#ef4444',
-  YELLOW: '#f59e0b',
-  GREEN: '#10b981',
-} as const;
+// ─── Risk Level Labels ────────────────────────────────────────────────────────
 
 export const RISK_LABELS = {
   RED: '🔴 High Risk',
@@ -20,18 +15,32 @@ export const RISK_LABELS = {
   GREEN: '🟢 Low Risk',
 } as const;
 
-// ─── Comment Text Builder ────────────────────────────────────────────────────
+// ─── Promise wrapper ──────────────────────────────────────────────────────────
 
 /**
- * Build the display text for a finding comment.
+ * Wrap the callback-based ONLYOFFICE executeMethod in a Promise.
+ * The real ONLYOFFICE Connector API is: executeMethod(name, args, callback) → void
+ * This helper lets callers use async/await.
  */
+function execMethod<T = unknown>(
+  connector: OOConnector,
+  method: string,
+  args?: unknown[]
+): Promise<T> {
+  return new Promise<T>((resolve) => {
+    connector.executeMethod(method, args ?? [], (result) => resolve(result as T));
+  });
+}
+
+// ─── Comment Text Builder ─────────────────────────────────────────────────────
+
 export function buildCommentText(finding: FindingCommentData): string {
   const riskLabel = RISK_LABELS[finding.riskLevel];
   const parts = [
-    `${riskLabel}`,
-    ``,
-    `${finding.summary}`,
-    ``,
+    riskLabel,
+    '',
+    finding.summary,
+    '',
     `Rule: ${finding.matchedRuleTitle}`,
   ];
 
@@ -42,85 +51,90 @@ export function buildCommentText(finding: FindingCommentData): string {
   return parts.join('\n');
 }
 
-/**
- * Build the custom data payload for a comment (for retrieval/integration).
- */
-export function buildCommentData(finding: FindingCommentData): string {
-  return JSON.stringify({
-    findingId: finding.findingId,
-    clauseId: finding.clauseId,
-    riskLevel: finding.riskLevel,
-    matchedRuleId: finding.matchedRuleId,
-    type: 'ai-finding',
-  });
-}
-
-// ─── Comment Injection via ONLYOFFICE Connector ──────────────────────────────
+// ─── Comment Injection via ONLYOFFICE Connector ───────────────────────────────
 
 /**
- * Inject a single finding as an ONLYOFFICE comment via the document connector API.
- * Uses text search to position the comment at the finding excerpt location.
- * Falls back to clause-level positioning if exact match unavailable.
+ * Inject a single finding as an ONLYOFFICE comment.
  *
- * @param connector - The ONLYOFFICE document connector instance (window.Asc.plugin.executeMethod)
- * @param finding - The finding data to inject
+ * Strategy:
+ * 1. If the finding has an excerpt, call SearchNext to find and select the text.
+ *    AddComment then anchors to that selection → inline highlight in the document.
+ * 2. If no excerpt or text not found, AddComment without selection (appears in
+ *    comments sidebar only, no inline highlight).
  */
-export function buildCommentPayload(finding: FindingCommentData): Record<string, unknown> {
-  // Truncate quote text to 60 chars for ONLYOFFICE search
-  const quoteText = finding.excerpt
-    ? finding.excerpt.substring(0, 60)
-    : '';
+async function injectSingleComment(
+  connector: OOConnector,
+  finding: FindingCommentData
+): Promise<CommentInjectionResult> {
+  const payload: Record<string, unknown> = {
+    // ONLYOFFICE Connector API field names (case-sensitive):
+    Id: finding.findingId,              // stable ID for MoveToComment navigation
+    Comment: buildCommentText(finding), // "Comment", NOT "Text"
+    UserName: 'AI Analysis',
+    Time: Date.now().toString(),        // milliseconds since epoch as string
+    Solved: false,
+    Replies: [],
+  };
+
+  let positioned = false;
+
+  // Try to find and select the excerpt text so the comment is anchored inline
+  if (finding.excerpt) {
+    const searchText = finding.excerpt.substring(0, 100).trim();
+    try {
+      const found = await execMethod<boolean>(connector, 'SearchNext', [{
+        c_sText: searchText,
+        c_bMatchCase: false,
+        c_bWholeWord: false,
+        c_bRegExp: false,
+      }]);
+      positioned = !!found;
+      if (!found) {
+        console.debug(`[CommentInjector] Text not found for finding ${finding.findingId}: "${searchText.substring(0, 40)}..."`);
+      }
+    } catch (err) {
+      console.debug(`[CommentInjector] SearchNext failed for finding ${finding.findingId}:`, err);
+    }
+  }
+
+  // Add the comment at the current selection (or document position if not positioned)
+  const assignedId = await execMethod<string>(connector, 'AddComment', [payload]);
+  const success = typeof assignedId === 'string' && assignedId.length > 0;
 
   return {
-    Text: buildCommentText(finding),
-    UserName: 'AI Analysis',
-    Time: new Date().toISOString(),
-    Solved: false,
-    Data: buildCommentData(finding),
-    QuoteText: quoteText,
+    findingId: finding.findingId,
+    success,
+    positioned,
+    error: success ? undefined : 'AddComment returned no ID',
   };
 }
 
 /**
  * Inject multiple findings as comments.
- * Batches injections with a small delay to avoid overwhelming ONLYOFFICE.
+ * Sequential injection ensures search position advances correctly through the document.
  */
 export async function injectFindingsAsComments(
-  connector: { executeMethod: (method: string, args: unknown[]) => Promise<void> },
+  connector: OOConnector,
   findings: FindingCommentData[]
 ): Promise<CommentInjectionResult[]> {
   const results: CommentInjectionResult[] = [];
-  const BATCH_SIZE = 20;
-  const BATCH_DELAY_MS = 100;
 
-  for (let i = 0; i < findings.length; i += BATCH_SIZE) {
-    const batch = findings.slice(i, i + BATCH_SIZE);
-
-    for (const finding of batch) {
-      try {
-        const payload = buildCommentPayload(finding);
-        await connector.executeMethod('AddComment', [payload]);
-
-        results.push({
-          findingId: finding.findingId,
-          success: true,
-          positioned: !!finding.excerpt,
-        });
-      } catch (error) {
-        console.error(`[CommentInjector] Failed to inject comment for finding ${finding.findingId}:`, error);
-        results.push({
-          findingId: finding.findingId,
-          success: false,
-          positioned: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
+  for (const finding of findings) {
+    try {
+      const result = await injectSingleComment(connector, finding);
+      results.push(result);
+    } catch (error) {
+      console.error(`[CommentInjector] Failed to inject finding ${finding.findingId}:`, error);
+      results.push({
+        findingId: finding.findingId,
+        success: false,
+        positioned: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
 
-    // Small delay between batches to prevent overwhelming ONLYOFFICE
-    if (i + BATCH_SIZE < findings.length) {
-      await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
-    }
+    // Small delay between injections to avoid overwhelming ONLYOFFICE
+    await new Promise((resolve) => setTimeout(resolve, 80));
   }
 
   return results;
@@ -128,16 +142,14 @@ export async function injectFindingsAsComments(
 
 /**
  * Navigate to a specific comment in the ONLYOFFICE document.
- * Used for sidebar finding click → document navigation.
+ * Used for sidebar finding click → document scroll.
  */
 export async function navigateToComment(
-  connector: { executeMethod: (method: string, args: unknown[]) => Promise<void> },
+  connector: OOConnector,
   findingId: string
 ): Promise<void> {
-  // ONLYOFFICE doesn't have a direct "go to comment" method,
-  // but we can search for the comment's quote text
   try {
-    await connector.executeMethod('MoveToComment', [findingId]);
+    await execMethod(connector, 'MoveToComment', [{ sId: findingId }]);
   } catch (error) {
     console.error(`[CommentInjector] Failed to navigate to comment ${findingId}:`, error);
   }

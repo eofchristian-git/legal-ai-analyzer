@@ -36,12 +36,11 @@ import { RiskHeatmap } from "./_components/risk-heatmap";
 import { ActivityTimeline } from "./_components/activity-timeline";
 import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
-import { DocumentViewer } from "./_components/document-viewer/document-viewer";
 import { OnlyOfficeDocumentViewer } from "./_components/onlyoffice-viewer/onlyoffice-document-viewer";
 import { RedlineExportModal } from "./_components/redline-export-modal";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
-import type { ContractDocumentData, HighlightFinding, HighlightClause } from "@/types/document-viewer";
+import type { TrackChangeData } from "@/types/onlyoffice";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -71,11 +70,9 @@ export default function ContractDetailPage() {
     totalFindingCount: number;
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>>({});
-  // Feature 008 T032: Full projection data for tracked changes in document viewer
-  const [allFullProjections, setAllFullProjections] = useState<Record<string, ProjectionResult>>({});
-  // Feature 008: Document viewer state
-  const [documentData, setDocumentData] = useState<ContractDocumentData | null>(null);
-  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'document' | 'onlyoffice'>('clause'); // Toggle between views
+  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'onlyoffice'>('clause');
+  // Tracked changes from APPLY_FALLBACK / EDIT_MANUAL decisions for ONLYOFFICE viewer
+  const [onlyOfficeTrackChanges, setOnlyOfficeTrackChanges] = useState<TrackChangeData[]>([]);
   // T043: Redline export modal state
   const [redlineExportOpen, setRedlineExportOpen] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
@@ -201,7 +198,6 @@ export default function ContractDetailPage() {
       );
 
       // Process results
-      const fullProjections: Record<string, ProjectionResult> = {};
       results.forEach((result) => {
         if (result.status === 'fulfilled' && result.value?.projection) {
           const { clauseId, projection } = result.value;
@@ -210,17 +206,33 @@ export default function ContractDetailPage() {
             totalFindingCount: projection.totalFindingCount || 0,
             effectiveStatus: projection.effectiveStatus || 'PENDING'
           };
-          // T032: Store full projection for tracked changes
-          fullProjections[clauseId] = projection;
         }
       });
 
       setClauseProjections(projections);
-      setAllFullProjections(fullProjections);
     };
 
     fetchAllProjections();
   }, [contract?.analysis?.clauses, historyRefreshKey]);
+
+  // Fetch ONLYOFFICE tracked changes (APPLY_FALLBACK / EDIT_MANUAL decisions) for the viewer
+  useEffect(() => {
+    if (!contract?.analysis) return;
+
+    const fetchTrackedChanges = async () => {
+      try {
+        const res = await fetch(`/api/contracts/${params.id}/onlyoffice-tracked-changes`);
+        if (res.ok) {
+          const data = await res.json();
+          setOnlyOfficeTrackChanges(data.changes ?? []);
+        }
+      } catch {
+        // Non-critical — viewer works without tracked changes
+      }
+    };
+
+    fetchTrackedChanges();
+  }, [contract?.analysis, params.id, historyRefreshKey]);
 
   // T031: Fetch projection when clause is selected (Feature 006)
   useEffect(() => {
@@ -267,86 +279,6 @@ export default function ContractDetailPage() {
 
     fetchProjection();
   }, [selectedClauseId, historyRefreshKey]);
-
-  // T055: Auto-refresh document when conversionStatus = 'processing'
-  useEffect(() => {
-    if (!documentData) return;
-    if (documentData.conversionStatus !== 'processing') return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/contracts/${params.id}/document`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.document?.conversionStatus !== 'processing') {
-            setDocumentData(data.document);
-            if (data.document?.htmlContent) {
-              setDocumentViewMode('document');
-            }
-            clearInterval(interval);
-          }
-        }
-      } catch {
-        // Ignore polling errors
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [documentData?.conversionStatus, params.id]);
-
-  // Feature 008: Fetch document data for document viewer
-  useEffect(() => {
-    const fetchDocument = async () => {
-      console.log('[DocumentFetch] Starting fetch...', {
-        hasContract: !!contract,
-        hasAnalysis: !!contract?.analysis,
-        clauseCount: contract?.analysis?.clauses?.length || 0,
-        contractId: params.id,
-      });
-
-      if (!contract?.analysis || contract.analysis.clauses.length === 0) {
-        console.log('[DocumentFetch] Skipping: No analysis or clauses');
-        setDocumentData(null);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/contracts/${params.id}/document`);
-        console.log('[DocumentFetch] Response:', response.status, response.statusText);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[DocumentFetch] Data received:', {
-            success: data.success,
-            hasHtmlContent: !!data.document?.htmlContent,
-            htmlLength: data.document?.htmlContent?.length || 0,
-            pageCount: data.document?.pageCount,
-            clausePositionsCount: data.document?.clausePositions?.length || 0,
-            findingPositionsCount: data.document?.findingPositions?.length || 0,
-          });
-          
-          setDocumentData(data.document);
-          // Enable document view mode if document is available
-          if (data.document?.htmlContent) {
-            console.log('[DocumentFetch] Setting view mode to document');
-            setDocumentViewMode('document');
-          }
-        } else {
-          const errorData = await response.json();
-          console.log('[DocumentFetch] Error response:', errorData);
-          // Document not ready yet, stay in clause view mode
-          setDocumentData(null);
-          setDocumentViewMode('clause');
-        }
-      } catch (error) {
-        console.error('[DocumentFetch] Exception:', error);
-        setDocumentData(null);
-        setDocumentViewMode('clause');
-      }
-    };
-
-    fetchDocument();
-  }, [contract?.analysis, params.id]);
 
   // Reset edit mode when switching clauses
   useEffect(() => {
@@ -666,18 +598,6 @@ export default function ContractDetailPage() {
                         >
                           Document View
                         </Button>
-                        {/* @deprecated Feature 008 HTML viewer — retained for legacy contracts */}
-                        {documentData?.htmlContent && (
-                          <Button
-                            variant={documentViewMode === 'document' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setDocumentViewMode('document')}
-                            className="text-muted-foreground"
-                            title="Legacy HTML viewer (Feature 008) — retained for backward compatibility"
-                          >
-                            Legacy View
-                          </Button>
-                        )}
                       </div>
                     )}
                     
@@ -690,6 +610,8 @@ export default function ContractDetailPage() {
                         mode={isFinalized ? 'view' : 'edit'}
                         onDocumentReady={() => console.log('[ONLYOFFICE] Document ready in viewer')}
                         onError={(error) => console.error('[ONLYOFFICE] Viewer error:', error)}
+                        selectedClauseId={selectedClauseId}
+                        trackChanges={onlyOfficeTrackChanges}
                         findings={
                           contract.analysis?.clauses.flatMap((clause) =>
                             clause.findings.map((f) => ({
@@ -697,43 +619,10 @@ export default function ContractDetailPage() {
                               clauseId: clause.id,
                               riskLevel: f.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
                               matchedRuleTitle: f.matchedRuleTitle,
-                              matchedRuleId: f.matchedRuleId || undefined,
                               summary: f.summary,
                               excerpt: f.excerpt,
                             }))
                           ) ?? []
-                        }
-                      />
-                    ) : documentViewMode === 'document' && documentData?.htmlContent ? (
-                      <DocumentViewer
-                        contractId={contract.id}
-                        htmlContent={documentData.htmlContent}
-                        pageCount={documentData.pageCount}
-                        clausePositions={documentData.clausePositions}
-                        findingPositions={documentData.findingPositions}
-                        selectedClauseId={selectedClauseId}
-                        onClauseClick={setSelectedClauseId}
-                        onFindingClick={(findingId, clauseId) => {
-                          setSelectedClauseId(clauseId);
-                        }}
-                        allProjections={allFullProjections}
-                        highlightFindings={
-                          contract.analysis?.clauses.flatMap((clause) =>
-                            clause.findings.map((f): HighlightFinding => ({
-                              findingId: f.id,
-                              clauseId: clause.id,
-                              excerpt: f.excerpt,
-                              riskLevel: f.riskLevel,
-                            }))
-                          ) ?? []
-                        }
-                        highlightClauses={
-                          contract.analysis?.clauses.map((clause): HighlightClause => ({
-                            clauseId: clause.id,
-                            clauseNumber: clause.clauseNumber,
-                            clauseName: clause.clauseName,
-                            clauseText: clause.clauseText,
-                          })) ?? []
                         }
                       />
                     ) : (

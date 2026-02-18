@@ -3,17 +3,24 @@
 /**
  * Finding Comments Component
  * Feature 009 T019: Injects AI-generated findings as ONLYOFFICE comments
- * after document load, with risk-level styling and sidebar navigation
+ * after document load, with risk-level styling and sidebar navigation.
+ *
+ * Note: Comment injection via the Connector API requires ONLYOFFICE Developer/Enterprise Edition.
+ * On Community Edition (connector=null), this component gracefully degrades — findings are
+ * still shown in the sidebar panel.
  */
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   injectFindingsAsComments,
   navigateToComment,
 } from "@/lib/onlyoffice/comment-injector";
 import type { FindingCommentData, CommentInjectionResult } from "@/types/onlyoffice";
+import type { OOConnector } from "./onlyoffice-document-viewer";
 
 interface FindingCommentsProps {
+  /** Connector from the parent viewer (null on Community Edition) */
+  connector: OOConnector | null;
   /** Array of findings to inject as comments */
   findings: FindingCommentData[];
   /** Whether the ONLYOFFICE document is ready for API calls */
@@ -22,51 +29,32 @@ interface FindingCommentsProps {
   onInjectionComplete?: (results: CommentInjectionResult[]) => void;
   /** Finding ID to navigate to (from sidebar click) */
   navigateToFindingId?: string | null;
+  /** Clause ID to navigate to (from clause list click) — jumps to the first finding in that clause */
+  navigateToClauseId?: string | null;
 }
 
 export function FindingComments({
+  connector,
   findings,
   documentReady,
   onInjectionComplete,
   navigateToFindingId,
+  navigateToClauseId,
 }: FindingCommentsProps) {
   const injectedRef = useRef(false);
-  const [injectionResults, setInjectionResults] = useState<CommentInjectionResult[]>([]);
-  const [injecting, setInjecting] = useState(false);
+  const [, setInjectionResults] = useState<CommentInjectionResult[]>([]);
 
-  // Get the ONLYOFFICE connector instance
-  const getConnector = useCallback(() => {
-    try {
-      // Access the ONLYOFFICE editor instance from the window
-      const editorInstances = (window as unknown as Record<string, unknown>)?.DocEditor;
-      if (editorInstances && typeof editorInstances === 'object') {
-        const instances = (editorInstances as Record<string, unknown>)?.instances;
-        if (instances && typeof instances === 'object') {
-          return (instances as Record<string, { executeMethod: (method: string, args: unknown[]) => Promise<void> }>)['onlyoffice-editor'];
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Inject findings as comments once document is ready
+  // Inject findings as comments once both document and connector are ready
   useEffect(() => {
-    if (!documentReady || injectedRef.current || findings.length === 0) {
+    if (!documentReady || !connector || injectedRef.current || findings.length === 0) {
       return;
     }
 
-    const inject = async () => {
-      const connector = getConnector();
-      if (!connector) {
-        console.warn("[FindingComments] ONLYOFFICE connector not available yet");
-        return;
-      }
+    injectedRef.current = true;
 
-      setInjecting(true);
-      injectedRef.current = true;
+    let cancelled = false;
 
+    const run = async () => {
       console.log(`[FindingComments] Injecting ${findings.length} findings as comments...`);
       const startTime = Date.now();
 
@@ -78,25 +66,39 @@ export function FindingComments({
         `[FindingComments] Injection complete: ${successCount}/${findings.length} succeeded in ${elapsed}ms`
       );
 
-      setInjectionResults(results);
-      setInjecting(false);
-      onInjectionComplete?.(results);
+      if (!cancelled) {
+        setInjectionResults(results);
+        onInjectionComplete?.(results);
+      }
     };
 
-    // Small delay to ensure ONLYOFFICE is fully initialized
-    const timer = setTimeout(inject, 500);
-    return () => clearTimeout(timer);
-  }, [documentReady, findings, getConnector, onInjectionComplete]);
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentReady, connector, findings, onInjectionComplete]);
+
+  // Reset injection guard when the findings set changes (e.g. new analysis)
+  useEffect(() => {
+    injectedRef.current = false;
+  }, [findings.length]);
 
   // Handle sidebar finding navigation (click → scroll to comment)
   useEffect(() => {
-    if (!navigateToFindingId || !documentReady) return;
-
-    const connector = getConnector();
-    if (!connector) return;
-
+    if (!navigateToFindingId || !documentReady || !connector) return;
     navigateToComment(connector, navigateToFindingId);
-  }, [navigateToFindingId, documentReady, getConnector]);
+  }, [navigateToFindingId, documentReady, connector]);
+
+  // Handle clause list navigation — navigate to the first finding in the selected clause
+  useEffect(() => {
+    if (!navigateToClauseId || !documentReady || !connector) return;
+
+    const firstFinding = findings.find((f) => f.clauseId === navigateToClauseId);
+    if (firstFinding) {
+      navigateToComment(connector, firstFinding.findingId);
+    }
+  }, [navigateToClauseId, documentReady, connector, findings]);
 
   // This component is invisible — it only manages comment injection lifecycle
   return null;

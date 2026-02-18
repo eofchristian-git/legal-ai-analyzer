@@ -3,6 +3,17 @@ import { NextResponse } from "next/server";
 
 const publicPaths = ["/login", "/signup", "/api/auth"];
 
+// Routes called server-to-server by ONLYOFFICE Docker container (use JWT token auth, not session cookies)
+const onlyofficeServerPaths = [
+  "/api/onlyoffice/callback", // Callback from ONLYOFFICE Document Server
+  "/api/cron/cleanup-sessions", // Scheduled cleanup job
+];
+
+// Check if a path is an ONLYOFFICE download route: /api/contracts/[id]/download
+function isDocumentDownloadPath(pathname: string): boolean {
+  return /^\/api\/contracts\/[^/]+\/download/.test(pathname);
+}
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
@@ -11,8 +22,11 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Allow API auth routes
-  if (pathname.startsWith("/api/auth")) {
+  // Allow ONLYOFFICE server-to-server routes (they use JWT token auth, not session cookies)
+  if (
+    onlyofficeServerPaths.some((path) => pathname.startsWith(path)) ||
+    isDocumentDownloadPath(pathname)
+  ) {
     return NextResponse.next();
   }
 

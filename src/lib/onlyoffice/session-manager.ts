@@ -13,6 +13,7 @@ import {
   buildDownloadUrl,
   buildCallbackUrl,
   buildOnlyOfficeConfig,
+  getAppBaseUrl,
 } from './config';
 import type { SessionMode, TokenResponse } from '@/types/onlyoffice';
 import { logAuditEvent } from './audit-logger';
@@ -40,9 +41,11 @@ export async function createSession(options: CreateSessionOptions): Promise<Toke
   const accessToken = generateAccessToken(contractId, userId, mode);
   const downloadToken = generateDownloadToken(contractId);
 
-  // Build URLs
+  // Build URLs — these use Docker-accessible host for ONLYOFFICE server
   const downloadUrl = buildDownloadUrl(contractId, downloadToken);
   const callbackUrl = buildCallbackUrl(contractId);
+  // Browser-accessible download URL for the "Download" button in the UI
+  const browserDownloadUrl = `${getAppBaseUrl()}/api/contracts/${contractId}/download?token=${downloadToken}`;
 
   // Build ONLYOFFICE editor configuration
   const config = buildOnlyOfficeConfig({
@@ -86,7 +89,7 @@ export async function createSession(options: CreateSessionOptions): Promise<Toke
     documentKey,
     accessToken,
     downloadToken,
-    downloadUrl,
+    downloadUrl: browserDownloadUrl, // Browser-accessible URL for UI download button
     callbackUrl,
     mode,
     expiresAt: expiresAt.toISOString(),
@@ -346,12 +349,21 @@ export async function getActiveUsers(contractId: string): Promise<Array<{
     orderBy: { createdAt: 'asc' },
   });
 
-  return sessions.map((s) => ({
-    userId: s.userId,
-    userName: s.user.name,
-    mode: s.mode,
-    since: s.createdAt.toISOString(),
-  }));
+  // Deduplicate by userId — keep the most recent session per user
+  // (prefer 'edit' mode over 'view' if both exist)
+  const userMap = new Map<string, { userId: string; userName: string; mode: string; since: string }>();
+  for (const s of sessions) {
+    const existing = userMap.get(s.userId);
+    if (!existing || s.mode === 'edit') {
+      userMap.set(s.userId, {
+        userId: s.userId,
+        userName: s.user.name,
+        mode: s.mode,
+        since: s.createdAt.toISOString(),
+      });
+    }
+  }
+  return Array.from(userMap.values());
 }
 
 /**

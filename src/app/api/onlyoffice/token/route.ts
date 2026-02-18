@@ -75,8 +75,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Determine session mode: explicit mode > contract status
-    const sessionMode: SessionMode = mode || (contract.status === 'finalized' ? 'view' : 'edit');
+    // Always view mode — document is read-only, changes come from triage decisions
+    const sessionMode: SessionMode = 'view';
 
     // Create new ONLYOFFICE session
     const tokenResponse = await createSession({

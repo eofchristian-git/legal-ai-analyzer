@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import {
   getActiveUsers,
-  acquireEditorLock,
   checkAndReleaseIdleLocks,
 } from '@/lib/onlyoffice/session-manager';
 
@@ -29,17 +28,23 @@ export async function GET(
     // Get active users for this contract
     const activeUsers = await getActiveUsers(contractId);
 
-    // Check editor lock status
-    const lockStatus = await acquireEditorLock(contractId, session.user.id);
+    // Derive lock status from active users (read-only — no audit log)
+    const currentEditor = activeUsers.find(
+      (u) => u.mode === 'edit' && u.userId !== session.user!.id
+    );
 
     return NextResponse.json({
       activeUsers,
-      editorLock: lockStatus.acquired
-        ? { locked: false }
-        : {
+      editorLock: currentEditor
+        ? {
             locked: true,
-            holder: lockStatus.currentEditor,
-          },
+            holder: {
+              userId: currentEditor.userId,
+              userName: currentEditor.userName,
+              lockedAt: currentEditor.since,
+            },
+          }
+        : { locked: false },
       currentUserId: session.user.id,
     });
   } catch (error) {
