@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { convertDocument, detectFormat } from '@/lib/document-converter';
-import { calculatePositions, injectClauseMarkers } from '@/lib/position-mapper';
+import { calculatePositions, injectClauseMarkers, injectFindingMarkers } from '@/lib/position-mapper';
 import { sanitizeHTML } from '@/lib/html-sanitizer';
 import fs from 'fs/promises';
 
@@ -126,6 +126,17 @@ export async function POST(request: NextRequest) {
       let markedHTML = html;
       if (contract.analysis?.clauses && contract.analysis.clauses.length > 0) {
         markedHTML = injectClauseMarkers(html, contract.analysis.clauses);
+
+        // Inject finding markers for CSS-based highlighting
+        const allFindingsForMarkers = contract.analysis.clauses.flatMap(c =>
+          c.findings.map(f => ({
+            id: f.id,
+            clauseId: f.clauseId,
+            excerpt: f.excerpt,
+            riskLevel: f.riskLevel,
+          }))
+        );
+        markedHTML = injectFindingMarkers(markedHTML, allFindingsForMarkers);
       }
 
       // Step 3: Sanitize HTML
@@ -136,11 +147,12 @@ export async function POST(request: NextRequest) {
       let findingPositions: any[] = [];
 
       if (contract.analysis?.clauses && contract.analysis.clauses.length > 0) {
-        const allFindings = contract.analysis.clauses.flatMap(c => 
+        const allFindings = contract.analysis.clauses.flatMap(c =>
           c.findings.map(f => ({
             id: f.id,
             clauseId: f.clauseId,
             excerpt: f.excerpt,
+            riskLevel: f.riskLevel,
             locationPage: f.locationPage,
             locationPosition: f.locationPosition,
           }))

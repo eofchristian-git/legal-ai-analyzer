@@ -24,6 +24,7 @@ export interface FindingPosition {
   y: number;               // Vertical position (px)
   width: number;           // Bounding box width (px)
   height: number;          // Bounding box height (px)
+  riskLevel?: string;      // 'RED' | 'YELLOW' | 'GREEN'
 }
 
 /**
@@ -102,6 +103,26 @@ export interface ContractDocumentData {
   conversionError?: string | null;
   clausePositions: ClausePosition[];
   findingPositions: FindingPosition[];
+}
+
+/**
+ * Finding data needed for client-side text highlighting
+ */
+export interface HighlightFinding {
+  findingId: string;
+  clauseId: string;
+  excerpt: string;
+  riskLevel: string; // 'RED' | 'YELLOW' | 'GREEN'
+}
+
+/**
+ * Clause data needed for client-side data-clause-id marker injection
+ */
+export interface HighlightClause {
+  clauseId: string;
+  clauseNumber: string;
+  clauseName: string;
+  clauseText: string;
 }
 
 /**

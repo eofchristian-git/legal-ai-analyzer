@@ -1,0 +1,76 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.3s
+  Running TypeScript ...
+  Collecting page data using 21 workers ...
+  Generating static pages using 21 workers (0/28) ...
+  Generating static pages using 21 workers (7/28) 
+  Generating static pages using 21 workers (14/28) 
+  Generating static pages using 21 workers (21/28) 
+✓ Generating static pages using 21 workers (28/28) in 1017.1ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin/users
+├ ƒ /api/admin/users
+├ ƒ /api/admin/users/[id]
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/auth/register
+├ ƒ /api/clauses/[id]/decisions
+├ ƒ /api/clauses/[id]/projection
+├ ƒ /api/clients
+├ ƒ /api/clients/[id]
+├ ƒ /api/clients/[id]/contracts
+├ ƒ /api/clients/[id]/contracts/[contractId]
+├ ƒ /api/clients/[id]/contracts/[contractId]/review
+├ ƒ /api/clients/[id]/restore
+├ ƒ /api/compliance
+├ ƒ /api/compliance/[id]
+├ ƒ /api/contracts
+├ ƒ /api/contracts/[id]
+├ ƒ /api/contracts/[id]/activity
+├ ƒ /api/contracts/[id]/analyze
+├ ƒ /api/contracts/[id]/document
+├ ƒ /api/contracts/[id]/export
+├ ƒ /api/contracts/[id]/export-redline
+├ ƒ /api/contracts/[id]/finalize
+├ ƒ /api/contracts/[id]/findings
+├ ƒ /api/contracts/[id]/findings/[findingId]/comments
+├ ƒ /api/documents/convert
+├ ƒ /api/nda-triage
+├ ƒ /api/nda-triage/[id]
+├ ƒ /api/playbook
+├ ƒ /api/playbook/analyses
+├ ƒ /api/playbook/history
+├ ƒ /api/playbook/history/[version]
+├ ƒ /api/playbook/save
+├ ƒ /api/risk-assessment
+├ ƒ /api/risk-assessment/[id]
+├ ƒ /api/upload
+├ ƒ /api/users
+├ ○ /clients
+├ ƒ /clients/[id]
+├ ○ /compliance
+├ ƒ /compliance/[id]
+├ ○ /contracts
+├ ƒ /contracts/[id]
+├ ○ /contracts/upload
+├ ○ /login
+├ ○ /nda-triage
+├ ƒ /nda-triage/[id]
+├ ○ /playbook
+├ ○ /risk-assessment
+├ ƒ /risk-assessment/[id]
+└ ○ /signup
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

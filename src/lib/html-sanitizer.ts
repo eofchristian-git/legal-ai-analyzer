@@ -34,7 +34,7 @@ export function sanitizeHTML(html: string): string {
       // General
       'class', 'id', 'style',
       // Document viewer data attributes
-      'data-clause-id', 'data-clause-number', 'data-finding-id',
+      'data-clause-id', 'data-clause-number', 'data-finding-id', 'data-risk',
       'data-page', 'data-page-number', 'data-position',
       // Links
       'href', 'target', 'rel',

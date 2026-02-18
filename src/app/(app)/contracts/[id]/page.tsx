@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   FileText,
   Scale,
+  GitCompare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -36,9 +37,10 @@ import { ActivityTimeline } from "./_components/activity-timeline";
 import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
 import { DocumentViewer } from "./_components/document-viewer/document-viewer";
+import { RedlineExportModal } from "./_components/redline-export-modal";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
-import type { ContractDocumentData } from "@/types/document-viewer";
+import type { ContractDocumentData, HighlightFinding, HighlightClause } from "@/types/document-viewer";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -63,14 +65,18 @@ export default function ContractDetailPage() {
   const [activeModalFindingId, setActiveModalFindingId] = useState<string | null>(null);
   const [editingFindingId, setEditingFindingId] = useState<string | null>(null);
   // Feature 007 T011: Clause projection map for resolution progress
-  const [clauseProjections, setClauseProjections] = useState<Record<string, { 
-    resolvedCount: number; 
-    totalFindingCount: number; 
+  const [clauseProjections, setClauseProjections] = useState<Record<string, {
+    resolvedCount: number;
+    totalFindingCount: number;
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>>({});
+  // Feature 008 T032: Full projection data for tracked changes in document viewer
+  const [allFullProjections, setAllFullProjections] = useState<Record<string, ProjectionResult>>({});
   // Feature 008: Document viewer state
   const [documentData, setDocumentData] = useState<ContractDocumentData | null>(null);
   const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'document'>('clause'); // Toggle between views
+  // T043: Redline export modal state
+  const [redlineExportOpen, setRedlineExportOpen] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
   const isRedirecting = useRef(false);
@@ -194,6 +200,7 @@ export default function ContractDetailPage() {
       );
 
       // Process results
+      const fullProjections: Record<string, ProjectionResult> = {};
       results.forEach((result) => {
         if (result.status === 'fulfilled' && result.value?.projection) {
           const { clauseId, projection } = result.value;
@@ -202,10 +209,13 @@ export default function ContractDetailPage() {
             totalFindingCount: projection.totalFindingCount || 0,
             effectiveStatus: projection.effectiveStatus || 'PENDING'
           };
+          // T032: Store full projection for tracked changes
+          fullProjections[clauseId] = projection;
         }
       });
 
       setClauseProjections(projections);
+      setAllFullProjections(fullProjections);
     };
 
     fetchAllProjections();
@@ -256,6 +266,32 @@ export default function ContractDetailPage() {
 
     fetchProjection();
   }, [selectedClauseId, historyRefreshKey]);
+
+  // T055: Auto-refresh document when conversionStatus = 'processing'
+  useEffect(() => {
+    if (!documentData) return;
+    if (documentData.conversionStatus !== 'processing') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/contracts/${params.id}/document`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.document?.conversionStatus !== 'processing') {
+            setDocumentData(data.document);
+            if (data.document?.htmlContent) {
+              setDocumentViewMode('document');
+            }
+            clearInterval(interval);
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [documentData?.conversionStatus, params.id]);
 
   // Feature 008: Fetch document data for document viewer
   useEffect(() => {
@@ -512,6 +548,17 @@ export default function ContractDetailPage() {
                     <FileText className="h-4 w-4" />
                     PDF
                   </Button>
+                  {/* T043: Export Redline button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRedlineExportOpen(true)}
+                    className="gap-1.5"
+                    title="Export redlined document with all tracked changes"
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Redline
+                  </Button>
                 </>
               )}
               <Button onClick={handleAnalyzeClick} className="gap-2">
@@ -640,8 +687,26 @@ export default function ContractDetailPage() {
                         onClauseClick={setSelectedClauseId}
                         onFindingClick={(findingId, clauseId) => {
                           setSelectedClauseId(clauseId);
-                          // Scroll to finding in findings panel
                         }}
+                        allProjections={allFullProjections}
+                        highlightFindings={
+                          contract.analysis?.clauses.flatMap((clause) =>
+                            clause.findings.map((f): HighlightFinding => ({
+                              findingId: f.id,
+                              clauseId: clause.id,
+                              excerpt: f.excerpt,
+                              riskLevel: f.riskLevel,
+                            }))
+                          ) ?? []
+                        }
+                        highlightClauses={
+                          contract.analysis?.clauses.map((clause): HighlightClause => ({
+                            clauseId: clause.id,
+                            clauseNumber: clause.clauseNumber,
+                            clauseName: clause.clauseName,
+                            clauseText: clause.clauseText,
+                          })) ?? []
+                        }
                       />
                     ) : (
                       <ClauseText 
@@ -765,6 +830,16 @@ export default function ContractDetailPage() {
             setTimelineRefreshKey((k) => k + 1);
             setActiveModalFindingId(null);
           }}
+        />
+      )}
+
+      {/* Feature 008 T043: Redline Export Modal */}
+      {contract && (
+        <RedlineExportModal
+          open={redlineExportOpen}
+          onOpenChange={setRedlineExportOpen}
+          contractId={contract.id}
+          contractTitle={contract.title}
         />
       )}
     </div>

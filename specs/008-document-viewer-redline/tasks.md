@@ -77,12 +77,12 @@
 
 ### Navigation Implementation (US2)
 
-- [ ] T023 [P] [US2] Create navigation controls component `src/app/(app)/contracts/[id]/_components/document-viewer/navigation-controls.tsx`: Next/Previous finding buttons
-- [ ] T024 [US2] Implement scroll-to-clause in `document-viewer.tsx`: Smooth scroll to clause position when clicked in left panel
-- [ ] T025 [US2] Implement active clause visual indicator in `html-renderer.tsx`: Add border/background highlight for currently viewed clause
-- [ ] T026 [US2] Implement scroll sync (document → clause list) in `document-viewer.tsx`: Use Intersection Observer to detect visible clause, debounce 200-300ms
-- [ ] T027 [US2] Update clause list component `src/app/(app)/contracts/[id]/_components/clause-list.tsx`: Add auto-scroll to keep selected clause visible
-- [ ] T028 [US2] Integrate navigation controls into `document-viewer.tsx`: Wire up Next/Previous finding buttons
+- [X] T023 [P] [US2] Create navigation controls component `src/app/(app)/contracts/[id]/_components/document-viewer/navigation-controls.tsx`: Next/Previous finding buttons
+- [X] T024 [US2] Implement scroll-to-clause in `document-viewer.tsx`: Smooth scroll to clause position when clicked in left panel
+- [X] T025 [US2] Implement active clause visual indicator in `html-renderer.tsx`: Add border/background highlight for currently viewed clause
+- [X] T026 [US2] Implement scroll sync (document → clause list) in `document-viewer.tsx`: Use Intersection Observer to detect visible clause, debounce 200-300ms
+- [X] T027 [US2] Update clause list component `src/app/(app)/contracts/[id]/_components/clause-list.tsx`: Add auto-scroll to keep selected clause visible
+- [X] T028 [US2] Integrate navigation controls into `document-viewer.tsx`: Wire up Next/Previous finding buttons
 
 **Checkpoint**: User Story 2 complete - bi-directional navigation works independently, US1 functionality remains intact
 
@@ -96,13 +96,13 @@
 
 ### Tracked Changes UI (US3)
 
-- [ ] T029 [P] [US3] Create tracked changes layer component `src/app/(app)/contracts/[id]/_components/document-viewer/tracked-changes-layer.tsx`: Overlay for displaying deletions (red strikethrough) and insertions (blue underline)
-- [ ] T030 [P] [US3] Create tracked changes legend component `src/app/(app)/contracts/[id]/_components/document-viewer/tracked-changes-legend.tsx`: Display change types and user attribution
-- [ ] T031 [US3] Add tracked changes toggle in `document-viewer.tsx`: Button to show/hide tracked changes with state management
-- [ ] T032 [US3] Fetch projection data for all clauses in `page.tsx`: Compute projections to get tracked changes data from decision history
-- [ ] T033 [US3] Render tracked changes in `tracked-changes-layer.tsx`: Map projection data to visual overlays at correct positions
-- [ ] T034 [US3] Implement change attribution tooltips in `tracked-changes-layer.tsx`: Show decision type, user name, and timestamp on hover
-- [ ] T035 [US3] Integrate legend into `document-viewer.tsx`: Display tracked changes legend when toggle is ON
+- [X] T029 [P] [US3] Create tracked changes layer component `src/app/(app)/contracts/[id]/_components/document-viewer/tracked-changes-layer.tsx`: Overlay for displaying deletions (red strikethrough) and insertions (blue underline)
+- [X] T030 [P] [US3] Create tracked changes legend component `src/app/(app)/contracts/[id]/_components/document-viewer/tracked-changes-legend.tsx`: Display change types and user attribution
+- [X] T031 [US3] Add tracked changes toggle in `document-viewer.tsx`: Button to show/hide tracked changes with state management
+- [X] T032 [US3] Fetch projection data for all clauses in `page.tsx`: Compute projections to get tracked changes data from decision history
+- [X] T033 [US3] Render tracked changes in `tracked-changes-layer.tsx`: Map projection data to visual overlays at correct positions
+- [X] T034 [US3] Implement change attribution tooltips in `tracked-changes-layer.tsx`: Show decision type, user name, and timestamp on hover
+- [X] T035 [US3] Integrate legend into `document-viewer.tsx`: Display tracked changes legend when toggle is ON
 
 **Checkpoint**: User Story 3 complete - tracked changes display works independently, US1 & US2 functionality remains intact
 
@@ -116,14 +116,14 @@
 
 ### Export Infrastructure (US4)
 
-- [ ] T036 [P] [US4] Create document exporter utilities in `src/lib/document-exporter.ts`: generateWordDocument(), generatePDFDocument() functions
-- [ ] T037 [P] [US4] Create Word export logic in `src/lib/document-exporter.ts`: Use docx library to generate .docx with Track Changes format
-- [ ] T038 [P] [US4] Create PDF export logic in `src/lib/document-exporter.ts`: Use Puppeteer to render HTML with visual markup to PDF
-- [ ] T039 [US4] Create export API endpoint `src/app/api/contracts/[id]/export-redline/route.ts`: POST handler to generate and stream redlined documents
-- [ ] T040 [US4] Add metadata embedding in `document-exporter.ts`: Include contract title, counterparty, export date, reviewer in both Word and PDF
-- [ ] T041 [US4] Add change attribution in `document-exporter.ts`: Tag each change with author name and timestamp
-- [ ] T042 [US4] Create redline export modal component `src/app/(app)/contracts/[id]/_components/redline-export-modal.tsx`: Format selection (Word/PDF) and export confirmation
-- [ ] T043 [US4] Add "Export Redline" button to contract header in `page.tsx`: Trigger modal and handle download workflow
+- [X] T036 [P] [US4] Create document exporter utilities in `src/lib/document-exporter.ts`: generateWordDocument(), generatePDFDocument() functions
+- [X] T037 [P] [US4] Create Word export logic in `src/lib/document-exporter.ts`: Use docx library to generate .docx with Track Changes format
+- [X] T038 [P] [US4] Create PDF export logic in `src/lib/document-exporter.ts`: Use Puppeteer to render HTML with visual markup to PDF
+- [X] T039 [US4] Create export API endpoint `src/app/api/contracts/[id]/export-redline/route.ts`: POST handler to generate and stream redlined documents
+- [X] T040 [US4] Add metadata embedding in `document-exporter.ts`: Include contract title, counterparty, export date, reviewer in both Word and PDF
+- [X] T041 [US4] Add change attribution in `document-exporter.ts`: Tag each change with author name and timestamp
+- [X] T042 [US4] Create redline export modal component `src/app/(app)/contracts/[id]/_components/redline-export-modal.tsx`: Format selection (Word/PDF) and export confirmation
+- [X] T043 [US4] Add "Export Redline" button to contract header in `page.tsx`: Trigger modal and handle download workflow
 
 **Checkpoint**: User Story 4 complete - redline export works independently, US1-US3 functionality remains intact
 
@@ -137,12 +137,12 @@
 
 ### Enhanced Navigation (US5)
 
-- [ ] T044 [P] [US5] Add scrollbar markers in `document-viewer.tsx`: Render colored markers on custom scrollbar at finding positions
-- [ ] T045 [P] [US5] Implement keyboard shortcuts in `document-viewer.tsx`: Add event listeners for Ctrl+↓/↑ (Cmd+↓/↑ on Mac) to navigate findings
-- [ ] T046 [US5] Add finding counter in `navigation-controls.tsx`: Display "Finding X of Y" showing current position
-- [ ] T047 [US5] Implement next/previous finding logic in `document-viewer.tsx`: Calculate finding order and navigate sequentially
-- [ ] T048 [US5] Add filter integration in `navigation-controls.tsx`: Respect clause filters (risk level, resolution status) when navigating
-- [ ] T049 [US5] Handle edge cases in `navigation-controls.tsx`: Disable/wrap at first/last finding
+- [X] T044 [P] [US5] Add scrollbar markers in `document-viewer.tsx`: Render colored markers on custom scrollbar at finding positions
+- [X] T045 [P] [US5] Implement keyboard shortcuts in `document-viewer.tsx`: Add event listeners for Ctrl+↓/↑ (Cmd+↓/↑ on Mac) to navigate findings
+- [X] T046 [US5] Add finding counter in `navigation-controls.tsx`: Display "Finding X of Y" showing current position
+- [X] T047 [US5] Implement next/previous finding logic in `document-viewer.tsx`: Calculate finding order and navigate sequentially
+- [X] T048 [US5] Add filter integration in `navigation-controls.tsx`: Respect clause filters (risk level, resolution status) when navigating
+- [X] T049 [US5] Handle edge cases in `navigation-controls.tsx`: Disable/wrap at first/last finding
 
 **Checkpoint**: User Story 5 complete - all enhanced navigation features work, US1-US4 functionality remains intact
 
@@ -152,13 +152,13 @@
 
 **Purpose**: Optimize performance, add loading states, error handling, and accessibility improvements
 
-- [ ] T050 [P] Implement page caching in `document-viewer.tsx`: Cache rendered pages to improve scrolling performance
-- [ ] T051 [P] Add loading states in `document-viewer.tsx`: Show skeleton loaders while document and positions are loading
-- [ ] T052 [P] Add error handling in `document-viewer.tsx`: Display user-friendly errors for conversion failures, missing documents
-- [ ] T053 [P] Optimize virtualized scrolling in `document-viewer.tsx`: Fine-tune overscanCount and item size calculations
-- [ ] T054 [P] Add accessibility improvements: Keyboard navigation, ARIA labels, screen reader support
-- [ ] T055 Implement conversion status polling in `page.tsx`: Auto-refresh when conversionStatus = 'processing'
-- [ ] T056 Add export progress indicator in `redline-export-modal.tsx`: Show loading state during export generation
+- [X] T050 [P] Implement page caching in `document-viewer.tsx`: Cache rendered pages to improve scrolling performance
+- [X] T051 [P] Add loading states in `document-viewer.tsx`: Show skeleton loaders while document and positions are loading
+- [X] T052 [P] Add error handling in `document-viewer.tsx`: Display user-friendly errors for conversion failures, missing documents
+- [X] T053 [P] Optimize virtualized scrolling in `document-viewer.tsx`: Fine-tune overscanCount and item size calculations
+- [X] T054 [P] Add accessibility improvements: Keyboard navigation, ARIA labels, screen reader support
+- [X] T055 Implement conversion status polling in `page.tsx`: Auto-refresh when conversionStatus = 'processing'
+- [X] T056 Add export progress indicator in `redline-export-modal.tsx`: Show loading state during export generation
 - [ ] T057 Test with large documents (200+ pages): Verify performance targets (< 3s first page load)
 
 ---
@@ -167,8 +167,8 @@
 
 **Purpose**: Implement retention policy for HTML documents and position data
 
-- [ ] T058 Create retention policy utility in `src/lib/retention-policy.ts`: cleanupOldDocuments() function to delete HTML/positions after 90 days for draft/cancelled contracts
-- [ ] T059 Add retention job configuration: Setup cron or scheduled task to run cleanupOldDocuments() daily
+- [X] T058 Create retention policy utility in `src/lib/retention-policy.ts`: cleanupOldDocuments() function to delete HTML/positions after 90 days for draft/cancelled contracts
+- [X] T059 Add retention job configuration: Setup cron or scheduled task to run cleanupOldDocuments() daily
 - [ ] T060 Add retention metadata tracking in `prisma/schema.prisma`: Optional retentionExempt and lastAccessedAt fields (if needed)
 - [ ] T061 Test retention logic: Verify finalized contracts retained indefinitely, draft/cancelled deleted after 90 days
 

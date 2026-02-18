@@ -51,6 +51,39 @@ export function injectClauseMarkers(
 }
 
 /**
+ * Inject finding markers into HTML for CSS-based highlighting
+ * Wraps excerpt text with data-finding-id spans so they can be styled and clicked.
+ */
+export function injectFindingMarkers(
+  html: string,
+  findings: Array<{ id: string; clauseId: string; excerpt: string; riskLevel: string }>
+): string {
+  let result = html;
+
+  for (const finding of findings) {
+    const excerpt = finding.excerpt?.trim();
+    if (!excerpt || excerpt.length < 10) continue;
+
+    // Match the first 60 chars of the excerpt to locate it in the HTML
+    const searchText = excerpt.substring(0, 60);
+    const pos = result.indexOf(searchText);
+    if (pos === -1) continue;
+
+    const openTag = `<span data-finding-id="${finding.id}" data-clause-id="${finding.clauseId}" data-risk="${finding.riskLevel}">`;
+    const closeTag = '</span>';
+
+    result =
+      result.substring(0, pos) +
+      openTag +
+      result.substring(pos, pos + searchText.length) +
+      closeTag +
+      result.substring(pos + searchText.length);
+  }
+
+  return result;
+}
+
+/**
  * Calculate positions for all clauses and findings
  * Note: This is a simplified server-side implementation.
  * Production would use puppeteer to render and measure actual positions.

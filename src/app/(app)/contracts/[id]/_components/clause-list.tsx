@@ -2,7 +2,7 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { ArrowUpDown, Filter, CheckCircle2, AlertTriangle, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +49,17 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("ALL");
   const [sortMode, setSortMode] = useState<SortMode>("position");
   const [resolutionFilter, setResolutionFilter] = useState<ResolutionFilter>("ALL");
+  // T027: Ref map for auto-scrolling selected clause into view
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // T027: Auto-scroll selected clause into view when selectedClauseId changes (from document scroll sync)
+  useEffect(() => {
+    if (!selectedClauseId) return;
+    const el = itemRefs.current[selectedClauseId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedClauseId]);
 
   const filteredAndSorted = useMemo(() => {
     let result = [...clauses];
@@ -198,6 +209,7 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
             return (
               <button
                 key={clause.id}
+                ref={(el) => { itemRefs.current[clause.id] = el; }}
                 onClick={() => onSelectClause(clause.id)}
                 className={cn(
                   "w-full text-left rounded-md px-3 py-2.5 transition-all group",

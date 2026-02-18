@@ -135,12 +135,14 @@ async function convertPDFPage(
     
     const tx = item.transform;
     const x = tx[4];
-    const y = tx[5];
+    const rawY = tx[5];
     const width = item.width || 0;
     const height = item.height || 12;
-    
+    // PDF y-axis is bottom-up; CSS top is top-down — flip the coordinate
+    const y = viewport.height - rawY - height;
+
     return `
-      <span 
+      <span
         class="pdf-text-item"
         style="
           position: absolute;
