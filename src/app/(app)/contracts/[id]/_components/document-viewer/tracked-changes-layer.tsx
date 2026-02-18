@@ -1,5 +1,6 @@
 'use client';
 
+/** @deprecated Feature 008 — Tracked Changes Layer (DEPRECATED). Replaced by Feature 009 ONLYOFFICE native tracked changes. */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Tracked changes overlay layer for showing clause modifications (T029, T033, T034)
 

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Feature 008 — Document Viewer Types (DEPRECATED)
+ * Replaced by Feature 009: src/types/onlyoffice.ts
+ * Retained for backward compatibility with legacy document viewer components.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // TypeScript interfaces for document conversion and rendering
 

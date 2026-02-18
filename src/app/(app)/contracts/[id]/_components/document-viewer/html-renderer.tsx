@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * @deprecated Feature 008 — HTML Renderer (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE viewer handles rendering natively.
+ * Retained for backward compatibility with legacy contracts.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // HTML content renderer with proper sanitization and client-side highlights
 

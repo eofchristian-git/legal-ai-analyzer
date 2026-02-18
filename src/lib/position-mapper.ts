@@ -1,3 +1,8 @@
+/**
+ * @deprecated Feature 008 — Position Mapper (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE uses native document positioning.
+ * Retained for backward compatibility with legacy contracts.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Position mapping utilities for clauses and findings
 

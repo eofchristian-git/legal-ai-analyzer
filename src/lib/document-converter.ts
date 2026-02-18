@@ -1,3 +1,9 @@
+/**
+ * @deprecated Feature 008 — Document Converter (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE renders documents natively without HTML conversion.
+ * Retained for backward compatibility with contracts already converted to HTML.
+ * Removal planned after ONLYOFFICE validation is complete.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Document conversion utilities (Word/PDF → HTML)
 

@@ -1,5 +1,6 @@
 'use client';
 
+/** @deprecated Feature 008 — Navigation Controls (DEPRECATED). Replaced by Feature 009 ONLYOFFICE native navigation. */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Navigation controls for finding traversal (T023, T046, T048, T049)
 

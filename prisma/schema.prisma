@@ -46,7 +46,8 @@ model Contract {
 
   analysis         ContractAnalysis?
   activityLogs     ActivityLog[]
-  contractDocument ContractDocument?  // NEW: Document viewer data (Feature 008)
+  contractDocument ContractDocument?  // DEPRECATED: Document viewer data (Feature 008)
+  onlyOfficeSessions OnlyOfficeSession[] // NEW: ONLYOFFICE sessions (Feature 009)
 }
 
 // NEW: ContractDocument model for document viewer (Feature 008)
@@ -416,4 +417,37 @@ model User {
   clientsCreated             Client[]            @relation("ClientsCreated")
   clientContractsUploaded    ClientContract[]    @relation("ClientContractsUploaded")
   decisions                  ClauseDecision[]    @relation("ClauseDecisions")  // NEW: Decision history (Feature 006)
+  onlyOfficeSessions         OnlyOfficeSession[] @relation("UserSessions")     // NEW: ONLYOFFICE sessions (Feature 009)
+}
+
+// NEW: ONLYOFFICE Document Viewer session tracking (Feature 009)
+model OnlyOfficeSession {
+  id                String   @id @default(cuid())
+  contractId        String
+  contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  // ONLYOFFICE identifiers
+  documentKey       String   @unique
+
+  // Authentication tokens
+  accessToken       String   // JWT token for ONLYOFFICE authentication (4h expiry)
+  downloadToken     String   // JWT token for document download (1h expiry)
+
+  // Session configuration
+  mode              String   // 'view' | 'edit'
+  status            String   @default("active")  // 'active' | 'expired' | 'revoked'
+
+  // Timestamps
+  expiresAt         DateTime
+  lastRefreshedAt   DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([contractId])
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
 }

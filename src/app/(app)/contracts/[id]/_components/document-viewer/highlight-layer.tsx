@@ -1,5 +1,6 @@
 'use client';
 
+/** @deprecated Feature 008 — Highlight Layer (DEPRECATED). Replaced by Feature 009 ONLYOFFICE comment injection. */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Finding highlights overlay with color coding and tooltips
 

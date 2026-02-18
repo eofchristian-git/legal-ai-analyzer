@@ -1,3 +1,8 @@
+/**
+ * @deprecated Feature 008 — HTML Sanitizer (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE handles document rendering securely.
+ * Retained for backward compatibility with legacy HTML documents.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // HTML sanitization wrapper using DOMPurify
 

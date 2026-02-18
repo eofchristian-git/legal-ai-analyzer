@@ -1,5 +1,6 @@
 'use client';
 
+/** @deprecated Feature 008 — Tracked Changes Legend (DEPRECATED). Replaced by Feature 009 ONLYOFFICE native tracked changes. */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Legend for tracked changes display (T030, T035)
 

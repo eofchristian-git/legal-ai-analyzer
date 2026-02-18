@@ -1,5 +1,13 @@
 'use client';
 
+/**
+ * @deprecated Feature 008 — HTML Document Viewer (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE Document Viewer Integration.
+ * This component is retained for backward compatibility with contracts
+ * analyzed before ONLYOFFICE integration. New contracts should use
+ * OnlyOfficeDocumentViewer from onlyoffice-viewer/.
+ * Removal planned after ONLYOFFICE validation is complete (Phase 8, T039).
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Main document viewer container with navigation, scroll sync, and tracked changes
 

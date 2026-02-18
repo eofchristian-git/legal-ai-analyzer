@@ -6,7 +6,7 @@
 
 ## Overview
 
-This feature introduces a new `OnlyOfficeSession` entity to track active document viewing sessions with JWT tokens. It reuses existing entities (`Contract`, `Document`, `AnalysisFinding`, `ClauseDecision`) without modifications. The deprecated `ContractDocument` entity from Feature 008 will be removed after migration completes.
+This feature introduces a new `OnlyOfficeSession` entity to track active document viewing sessions with JWT tokens. It reuses existing entities (`Contract`, `Document`, `AnalysisFinding`, `ClauseDecision`) without modifications. The deprecated `ContractDocument` entity from Feature 008 will be removed after Feature 008 code is deleted. Legacy contracts are not migrated — they retain their existing viewer experience.
 
 ## Entity Definitions
 
@@ -116,15 +116,13 @@ Used to generate tracked changes from decision event log. No schema changes requ
 
 ### Deprecated Entity: ContractDocument (Feature 008)
 
-**Status**: Will be removed after ONLYOFFICE migration completes
+**Status**: Deprecated — will be removed when Feature 008 code is deleted
 
-This entity stored HTML-converted content and position mappings for the Feature 008 HTML viewer. No longer needed with ONLYOFFICE (handles rendering and positioning internally).
+This entity stored HTML-converted content and position mappings for the Feature 008 HTML viewer. No longer needed with ONLYOFFICE (handles rendering and positioning internally). Legacy contracts retain their existing viewer experience; no data migration is required.
 
-**Migration Plan**:
-1. Keep table until all contracts migrated to ONLYOFFICE
-2. Add deprecation notice in code comments
-3. Create migration guide for existing contracts
-4. After 100% migration, drop table via Prisma migration
+**Deprecation Plan**:
+1. Add deprecation notice in code comments
+2. After Feature 008 code is removed and validated, drop table via Prisma migration
 
 ---
 

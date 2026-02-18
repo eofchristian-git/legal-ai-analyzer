@@ -1,3 +1,8 @@
+/**
+ * @deprecated Feature 008 — HTML Document API (DEPRECATED)
+ * Replaced by Feature 009: ONLYOFFICE download API at /api/contracts/[id]/download
+ * Retained for backward compatibility with legacy HTML document viewer.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // API endpoint to fetch HTML document and position mappings
 

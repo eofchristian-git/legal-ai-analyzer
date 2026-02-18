@@ -1,3 +1,4 @@
+/** @deprecated Feature 008 — Position Utils (DEPRECATED). Replaced by Feature 009 ONLYOFFICE native positioning. */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Position calculation utilities for document viewer
 

@@ -344,13 +344,12 @@ This updates the agent-specific context file with new ONLYOFFICE dependencies an
 - T025: Implement error handling for ONLYOFFICE connection failures
 - T026: Add fallback to direct document download
 
-### Phase 5: Export & Migration (6 tasks)
+### Phase 5: Export & Deprecation (5 tasks)
 - T027: Implement export button with ONLYOFFICE native download
 - T028: Test exported Word documents in Microsoft Word
 - T029: Verify Track Changes format compatibility
-- T030: Create migration guide for existing contracts
-- T031: Deprecate Feature 008 HTML viewer code
-- T032: Remove document-converter.ts, position-mapper.ts, html-sanitizer.ts
+- T030: Deprecate Feature 008 HTML viewer code
+- T031: Remove document-converter.ts, position-mapper.ts, html-sanitizer.ts
 
 ### Phase 6: Polish & Documentation (4 tasks)
 - T033: Add loading indicators for document load and operations

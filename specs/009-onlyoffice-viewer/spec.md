@@ -124,7 +124,7 @@ Multiple legal reviewers from the same organization want to review a contract si
   - System displays an error message indicating the document viewer is temporarily unavailable and provides a link to download the original contract file directly
 
 - How does the system handle contracts uploaded before ONLYOFFICE integration (legacy contracts with HTML conversion)?
-  - System detects legacy contracts and offers a "Migrate to ONLYOFFICE" button that converts the stored HTML back to the original Word/PDF format and loads it in ONLYOFFICE
+  - Legacy contracts retain their existing viewer experience. Migration of previously analyzed contracts to ONLYOFFICE is out of scope — only newly uploaded contracts use the ONLYOFFICE viewer. Users who need ONLYOFFICE viewing for an old contract can re-upload the original document
 
 - What happens when a finding's text position cannot be mapped to a specific location in the ONLYOFFICE document?
   - Finding comment is positioned at the clause-level (first paragraph of the clause) with a note "Exact position unavailable - positioned at clause start"
@@ -181,7 +181,7 @@ Multiple legal reviewers from the same organization want to review a contract si
 - **FR-020**: System MUST validate user permissions before generating ONLYOFFICE access tokens (only authorized users can view contracts)
 - **FR-021**: System MUST configure ONLYOFFICE viewer mode (edit vs. view-only) based on user permissions and contract status
 - **FR-022**: System MUST remove the current HTML conversion logic (mammoth.js, pdf.js) after ONLYOFFICE integration is complete
-- **FR-023**: System MUST migrate existing contracts from HTML storage to original document format for ONLYOFFICE viewing
+- **FR-023**: ~~REMOVED~~ — Legacy contract migration is out of scope. Only newly uploaded contracts use ONLYOFFICE viewer; existing contracts retain their current viewer experience
 - **FR-024**: System MUST support zoom controls in ONLYOFFICE (zoom in, zoom out, fit to width, fit to page)
 - **FR-025**: System MUST support page navigation in ONLYOFFICE (next/previous page, page thumbnails, page number input)
 - **FR-026**: System MUST handle finding comments that span multiple lines or paragraphs by positioning at the start of the span
@@ -212,7 +212,7 @@ Multiple legal reviewers from the same organization want to review a contract si
 
 - **FR-043**: ONLYOFFICE Document Server MUST maintain a 95% uptime target measured over a rolling 30-day window
 - **FR-044**: System MUST detect ONLYOFFICE Document Server outages within 5 minutes via periodic health checks
-- **FR-045**: System MUST display a user-friendly fallback (document download link + read-only clause panel) when ONLYOFFICE is unavailable
+- **FR-045**: System MUST display a user-friendly fallback (document download link) when ONLYOFFICE is unavailable
 - **FR-046**: System MUST support manual restart of ONLYOFFICE Document Server without data loss for in-progress editing sessions (via callback save on close)
 - **FR-047**: System MUST run as a single ONLYOFFICE instance; multi-instance/HA deployment is not required at this stage
 
@@ -306,12 +306,7 @@ Multiple legal reviewers from the same organization want to review a contract si
    - Enable Track Changes toggle
    - Test export functionality
 
-5. **Phase 5 - Legacy Contract Migration**:
-   - Create migration script to restore original contract files for legacy contracts
-   - Offer manual "Migrate to ONLYOFFICE" button for users
-   - Monitor migration success rate
-
-6. **Phase 6 - Deprecation**:
+5. **Phase 5 - Deprecation**:
    - Remove HTML viewer code (mammoth.js, pdf.js, document-converter.ts, html-renderer.tsx)
    - Clean up database schema (remove htmlContent, clausePositions, findingPositions from ContractDocument)
    - Archive Feature 008 documentation with deprecation notice

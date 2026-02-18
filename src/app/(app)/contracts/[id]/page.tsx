@@ -37,6 +37,7 @@ import { ActivityTimeline } from "./_components/activity-timeline";
 import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
 import { DocumentViewer } from "./_components/document-viewer/document-viewer";
+import { OnlyOfficeDocumentViewer } from "./_components/onlyoffice-viewer/onlyoffice-document-viewer";
 import { RedlineExportModal } from "./_components/redline-export-modal";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
@@ -74,7 +75,7 @@ export default function ContractDetailPage() {
   const [allFullProjections, setAllFullProjections] = useState<Record<string, ProjectionResult>>({});
   // Feature 008: Document viewer state
   const [documentData, setDocumentData] = useState<ContractDocumentData | null>(null);
-  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'document'>('clause'); // Toggle between views
+  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'document' | 'onlyoffice'>('clause'); // Toggle between views
   // T043: Redline export modal state
   const [redlineExportOpen, setRedlineExportOpen] = useState(false);
   const autoAnalyzeTriggered = useRef(false);
@@ -649,34 +650,61 @@ export default function ContractDetailPage() {
                 <ResizablePanel defaultSize="45%" minSize="25%">
                   <div className="h-full overflow-hidden flex flex-col">
                     {/* View mode toggle */}
-                    {(() => {
-                      console.log('[ButtonsRender] documentData:', {
-                        exists: !!documentData,
-                        hasHtmlContent: !!documentData?.htmlContent,
-                        htmlLength: documentData?.htmlContent?.length || 0,
-                      });
-                      return documentData?.htmlContent && (
-                        <div className="p-2 border-b flex gap-2">
-                          <Button
-                            variant={documentViewMode === 'clause' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setDocumentViewMode('clause')}
-                          >
-                            Clause View
-                          </Button>
+                    {analysis && (
+                      <div className="p-2 border-b flex gap-2">
+                        <Button
+                          variant={documentViewMode === 'clause' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setDocumentViewMode('clause')}
+                        >
+                          Clause View
+                        </Button>
+                        <Button
+                          variant={documentViewMode === 'onlyoffice' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setDocumentViewMode('onlyoffice')}
+                        >
+                          Document View
+                        </Button>
+                        {/* @deprecated Feature 008 HTML viewer — retained for legacy contracts */}
+                        {documentData?.htmlContent && (
                           <Button
                             variant={documentViewMode === 'document' ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setDocumentViewMode('document')}
+                            className="text-muted-foreground"
+                            title="Legacy HTML viewer (Feature 008) — retained for backward compatibility"
                           >
-                            Document View
+                            Legacy View
                           </Button>
-                        </div>
-                      );
-                    })()}
+                        )}
+                      </div>
+                    )}
                     
                     {/* Render based on view mode */}
-                    {documentViewMode === 'document' && documentData?.htmlContent ? (
+                    {documentViewMode === 'onlyoffice' ? (
+                      <OnlyOfficeDocumentViewer
+                        contractId={contract.id}
+                        contractTitle={contract.title}
+                        fileType={contract.document?.filename?.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+                        mode={isFinalized ? 'view' : 'edit'}
+                        onDocumentReady={() => console.log('[ONLYOFFICE] Document ready in viewer')}
+                        onError={(error) => console.error('[ONLYOFFICE] Viewer error:', error)}
+                        findings={
+                          contract.analysis?.clauses.flatMap((clause) =>
+                            clause.findings.map((f) => ({
+                              findingId: f.id,
+                              clauseId: clause.id,
+                              riskLevel: f.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
+                              matchedRuleTitle: f.matchedRuleTitle,
+                              matchedRuleId: f.matchedRuleId || undefined,
+                              summary: f.summary,
+                              excerpt: f.excerpt,
+                            }))
+                          ) ?? []
+                        }
+                      />
+                    ) : documentViewMode === 'document' && documentData?.htmlContent ? (
                       <DocumentViewer
                         contractId={contract.id}
                         htmlContent={documentData.htmlContent}
