@@ -22,11 +22,22 @@ const EXTENDED_SNIPPET_LENGTH = 140;
 // ─── Search String Extraction ────────────────────────────────────────────────
 
 /**
- * Clean text for search: normalize whitespace, remove special characters
- * that might interfere with Collabora's search engine.
+ * Clean text for search: normalize whitespace, Unicode, and typography characters
+ * that may differ between stored clause text and DOCX content.
+ *
+ * Normalizations applied (T005):
+ *  1. Unicode NFC normalization — ensures consistent code-point representation
+ *  2. En-dash / em-dash → ASCII hyphen (common typography substitution in DOCX)
+ *  3. Smart quotes → straight equivalents (Word/LibreOffice autocorrects these)
+ *  4. Zero-width character removal
+ *  5. Whitespace normalization (newlines → spaces, multiple spaces → single)
  */
 function cleanSearchText(text: string): string {
   return text
+    .normalize('NFC') // Unicode NFC normalization
+    .replace(/[\u2013\u2014]/g, '-') // En-dash / em-dash → hyphen
+    .replace(/[\u201C\u201D]/g, '"') // Smart double quotes → straight "
+    .replace(/[\u2018\u2019]/g, "'") // Smart single quotes → straight '
     .replace(/[\r\n]+/g, " ") // Collapse newlines to spaces
     .replace(/\s+/g, " ") // Normalize whitespace
     .replace(/[\u200B-\u200D\uFEFF]/g, "") // Remove zero-width chars
@@ -36,6 +47,10 @@ function cleanSearchText(text: string): string {
 /**
  * Extract the first sentence from text (up to the first period followed by a space).
  * Falls back to the first N characters if no sentence boundary found.
+ *
+ * Also handles parenthesized content that may span line breaks in the document:
+ * if the text before the first `(` is long enough (≥ MIN_SNIPPET_LENGTH), we
+ * truncate there to avoid search mismatches caused by in-document line wrapping.
  */
 function extractFirstSentence(text: string, maxLength: number = DEFAULT_SNIPPET_LENGTH): string {
   const cleaned = cleanSearchText(text);
@@ -43,6 +58,15 @@ function extractFirstSentence(text: string, maxLength: number = DEFAULT_SNIPPET_
   if (sentenceEnd > 0 && sentenceEnd < maxLength) {
     return cleaned.substring(0, sentenceEnd + 1);
   }
+
+  // Parenthesized content can span line breaks in the document, making the
+  // flat (newlines→spaces) search string unmatchable. Prefer truncating
+  // before the first `(` when the prefix is long enough to be unique.
+  const parenIdx = cleaned.indexOf("(");
+  if (parenIdx >= MIN_SNIPPET_LENGTH) {
+    return cleaned.substring(0, parenIdx).trim();
+  }
+
   // No sentence boundary — take first N characters, break at word boundary
   if (cleaned.length <= maxLength) return cleaned;
   const truncated = cleaned.substring(0, maxLength);

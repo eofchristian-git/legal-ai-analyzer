@@ -23,6 +23,7 @@ import type {
   DecisionActionType,
   ClauseDecisionPayload,
 } from "@/types/decisions";
+import { useCollaboraPendingQueue } from "./collabora-viewer";
 
 interface FindingActionsProps {
   finding: Finding;
@@ -59,6 +60,9 @@ export function FindingActions({
   onFallbackUndone,
 }: FindingActionsProps) {
   const [loading, setLoading] = useState<string | null>(null); // tracks which action is loading
+
+  // T023b: Access pending queue to enqueue DOCX changes (safe — returns no-op if provider absent)
+  const { enqueueChange } = useCollaboraPendingQueue();
 
   const status = findingStatus?.status;
   const isEscalated = status === "ESCALATED";
@@ -130,8 +134,19 @@ export function FindingActions({
         excerpt: finding.excerpt,
         replacementText: finding.fallbackText,
       });
+      // T023b: Enqueue the DOCX change so it's applied even if viewer was not mounted
+      enqueueChange({
+        clauseId,
+        type: 'APPLY_FALLBACK',
+        payload: {
+          findingId: finding.id,
+          excerpt: finding.excerpt,
+          replacementText: finding.fallbackText,
+        },
+        decidedAt: new Date().toISOString(),
+      });
     }
-  }, [postDecision, finding.fallbackText, finding.id, finding.excerpt, onFallbackApplied]);
+  }, [postDecision, finding.fallbackText, finding.id, finding.excerpt, onFallbackApplied, enqueueChange, clauseId]);
 
   const handleUndo = useCallback(async () => {
     // Fetch decision history for this clause, find last active decision for this finding
@@ -204,6 +219,18 @@ export function FindingActions({
           insertedText: lastActive.payload.replacementText,
           riskLevel: finding.riskLevel,
         });
+        // T023b: Enqueue the UNDO_FALLBACK DOCX change so it's applied even if viewer was not mounted
+        enqueueChange({
+          clauseId,
+          type: 'UNDO_FALLBACK',
+          payload: {
+            findingId: finding.id,
+            excerpt: finding.excerpt,
+            insertedText: lastActive.payload.replacementText,
+            riskLevel: finding.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
+          },
+          decidedAt: new Date().toISOString(),
+        });
       } else {
         console.log("[FindingActions] Undone decision was NOT APPLY_FALLBACK or no replacementText:", {
           actionType: lastActive.actionType,
@@ -215,7 +242,7 @@ export function FindingActions({
     } finally {
       setLoading(null);
     }
-  }, [clauseId, finding.id, finding.excerpt, finding.riskLevel, postDecision, onFallbackUndone]);
+  }, [clauseId, finding.id, finding.excerpt, finding.riskLevel, postDecision, onFallbackUndone, enqueueChange]);
 
   const handleRevert = useCallback(async () => {
     await postDecision("REVERT", {});

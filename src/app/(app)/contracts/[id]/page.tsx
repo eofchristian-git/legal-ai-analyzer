@@ -38,6 +38,7 @@ import { EscalateModal } from "./_components/escalate-modal";
 import { NoteInput } from "./_components/note-input";
 import { OnlyOfficeDocumentViewer } from "./_components/onlyoffice-viewer/onlyoffice-document-viewer";
 import { CollaboraDocumentViewer } from "./_components/collabora-viewer";
+import { CollaboraPendingQueueProvider } from "./_components/collabora-viewer/use-pending-document-queue";
 import { RedlineExportModal } from "./_components/redline-export-modal";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
@@ -413,6 +414,29 @@ export default function ContractDetailPage() {
     }
   }
 
+  async function handleCollaboraExport() {
+    try {
+      const res = await fetch(`/api/contracts/${params.id}/export-collabora`);
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || "Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${contract!.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-redline.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Redline document downloaded");
+    } catch {
+      toast.error("Export failed");
+    }
+  }
+
   if (loading || redirecting) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -451,7 +475,12 @@ export default function ContractDetailPage() {
   const yellowCount = analysis?.yellowCount ?? 0;
   const greenCount = analysis?.greenCount ?? 0;
 
+  // T021: Wrap with CollaboraPendingQueueProvider so the queue persists
+  // during SPA navigation within the contract review page.
+  const contractId = params.id as string;
+
   return (
+    <CollaboraPendingQueueProvider contractId={contractId}>
     <div className="flex flex-col h-full">
       <PageHeader
         title={contract.title}
@@ -489,13 +518,18 @@ export default function ContractDetailPage() {
                     <FileText className="h-4 w-4" />
                     PDF
                   </Button>
-                  {/* T043: Export Redline button */}
+                  {/* T043: Export Redline button — gated on finalization */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setRedlineExportOpen(true)}
+                    onClick={handleCollaboraExport}
+                    disabled={!contract?.analysis?.finalized}
                     className="gap-1.5"
-                    title="Export redlined document with all tracked changes"
+                    title={
+                      contract?.analysis?.finalized
+                        ? "Download the Collabora-edited document with tracked changes"
+                        : "Finalize the contract review to enable export"
+                    }
                   >
                     <GitCompare className="h-4 w-4" />
                     Redline
@@ -735,10 +769,10 @@ export default function ContractDetailPage() {
                       currentUserId={session?.user?.id}
                       currentUserRole={session?.user?.role}
                       onFallbackApplied={(data) => {
-                        // When in Collabora viewer mode, apply the redline visually
-                        if (documentViewMode === 'collabora') {
-                          setPendingRedline(data);
-                        }
+                        // Always set pendingRedline — if the Collabora viewer is mounted,
+                        // it applies immediately. If the user switches to Collabora later,
+                        // the pending state is picked up on mount.
+                        setPendingRedline(data);
                       }}
                       onFallbackUndone={(data) => {
                         console.log("[Page] onFallbackUndone received:", {
@@ -746,19 +780,17 @@ export default function ContractDetailPage() {
                           excerptLen: data.excerpt?.length,
                           insertedTextLen: data.insertedText?.length,
                           riskLevel: data.riskLevel,
-                          documentViewMode,
                         });
-                        // When in Collabora viewer mode, revert the redline visually
-                        if (documentViewMode === 'collabora') {
-                          const undoData = {
-                            findingId: data.findingId,
-                            excerpt: data.excerpt,
-                            insertedText: data.insertedText,
-                            riskLevel: data.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
-                          };
-                          console.log("[Page] Setting pendingUndoRedline:", undoData);
-                          setPendingUndoRedline(undoData);
-                        }
+                        // Always set pendingUndoRedline — picked up by Collabora viewer
+                        // immediately if mounted, or on next mount when user switches view.
+                        const undoData = {
+                          findingId: data.findingId,
+                          excerpt: data.excerpt,
+                          insertedText: data.insertedText,
+                          riskLevel: data.riskLevel as 'RED' | 'YELLOW' | 'GREEN',
+                        };
+                        console.log("[Page] Setting pendingUndoRedline:", undoData);
+                        setPendingUndoRedline(undoData);
                       }}
                     />
                   </div>
@@ -841,5 +873,6 @@ export default function ContractDetailPage() {
         />
       )}
     </div>
+    </CollaboraPendingQueueProvider>
   );
 }

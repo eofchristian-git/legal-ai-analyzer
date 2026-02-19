@@ -13,11 +13,18 @@
  *   RED    → #FFCCCC (light pink)
  *   YELLOW → #FFFFCC (light yellow)
  *   GREEN  → #CCFFCC (light green)
+ *
+ * NOTE: T013 bookmark anchoring was removed — .uno:InsertBookmark opens a dialog
+ * in Collabora Online instead of silently inserting a bookmark (V2 validation failed).
+ * Navigation uses text-search fallback exclusively (see use-clause-navigation.ts).
+ *
+ * T018: Trigger fires as soon as `isDocumentLoaded && !highlightsApplied`, not
+ *        waiting for `viewerState === 'ready'` (iframe can be behind preparation overlay).
  */
 
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import type { ClauseNavigationData } from "@/types/collabora";
 
 // ─── Risk level → background color (decimal RGB for UNO) ─────────────────────
@@ -35,8 +42,8 @@ const DEFAULT_COLOR = 0xffffcc;
 
 /** Delay after search command before applying color (ms) */
 const SEARCH_TO_COLOR_DELAY = 250;
-/** Delay after color command before processing next finding (ms) */
-const COLOR_TO_NEXT_DELAY = 150;
+/** Delay after color before processing next finding (ms) */
+const COLOR_TO_NEXT_DELAY = 200;
 /** Delay before starting the highlighting queue after document load (ms) */
 const INITIAL_DELAY = 2000;
 
@@ -51,6 +58,8 @@ interface HighlightQueueItem {
   findingId: string;
   /** Risk level string for debug logging */
   riskLevel: string;
+  /** Clause ID — for logging */
+  clauseId: string;
 }
 
 interface UseClauseHighlightingOptions {
@@ -68,10 +77,19 @@ interface UseClauseHighlightingOptions {
   onHighlightingComplete?: () => void;
 }
 
-// ─── Text cleaning (mirrors navigation.ts) ───────────────────────────────────
+interface UseClauseHighlightingReturn {
+  // No return values — bookmark anchoring removed (V2 failed).
+  // Highlighting is fire-and-forget; completion is signaled via onHighlightingComplete callback.
+}
+
+// ─── Text cleaning (mirrors navigation.ts with T005 normalizations) ───────────
 
 function cleanSearchText(text: string): string {
   return text
+    .normalize('NFC')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\r\n]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
@@ -87,13 +105,15 @@ export function useClauseHighlighting({
   sendMessage,
   highlightsAlreadyApplied = false,
   onHighlightingComplete,
-}: UseClauseHighlightingOptions): void {
+}: UseClauseHighlightingOptions): UseClauseHighlightingReturn {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const highlightedRef = useRef(false);
   const clausesRef = useRef(clauses);
-  clausesRef.current = clauses;
   const onHighlightingCompleteRef = useRef(onHighlightingComplete);
-  onHighlightingCompleteRef.current = onHighlightingComplete;
+
+  // Sync latest prop values into refs after each render (React 19: outside render body)
+  useLayoutEffect(() => { clausesRef.current = clauses; }, [clauses]);
+  useLayoutEffect(() => { onHighlightingCompleteRef.current = onHighlightingComplete; }, [onHighlightingComplete]);
 
   // ─── Build the highlight queue from clause/finding data ────────────
   const buildQueue = useCallback((): HighlightQueueItem[] => {
@@ -105,10 +125,6 @@ export function useClauseHighlighting({
 
       for (const finding of clause.findingDetails) {
         if (!finding.excerpt) continue;
-        // Use the FULL excerpt text — same text shown in the right panel.
-        // This ensures the entire deviated passage gets highlighted, not just
-        // a 70-char fragment. cleanSearchText normalizes whitespace but
-        // preserves the full length so the match covers the whole excerpt.
         const searchText = cleanSearchText(finding.excerpt);
         if (!searchText) continue;
 
@@ -117,6 +133,7 @@ export function useClauseHighlighting({
           color: RISK_COLORS[finding.riskLevel] ?? DEFAULT_COLOR,
           findingId: finding.id,
           riskLevel: finding.riskLevel,
+          clauseId: clause.id,
         });
       }
     }
@@ -131,6 +148,7 @@ export function useClauseHighlighting({
         "SearchItem.SearchString": { type: "string", value: searchText },
         "SearchItem.ReplaceString": { type: "string", value: "" },
         "SearchItem.Backward": { type: "boolean", value: false },
+        "SearchItem.RegularExpression": { type: "boolean", value: false },
         "SearchItem.SearchStartPointX": { type: "long", value: 0 },
         "SearchItem.SearchStartPointY": { type: "long", value: 0 },
         "SearchItem.Command": { type: "long", value: 0 }, // Find Next
@@ -142,7 +160,6 @@ export function useClauseHighlighting({
   // ─── Apply character background color to current selection ─────────
   const applyBackgroundColor = useCallback(
     (color: number) => {
-      // Try CharBackColor (character-level background — most reliable)
       executeUnoCommand(".uno:CharBackColor", {
         CharBackColor: { type: "long", value: color },
       });
@@ -159,6 +176,7 @@ export function useClauseHighlighting({
 
       if (queue.length === 0) {
         console.log("[Collabora Highlight] No findings to highlight");
+        onHighlightingCompleteRef.current?.();
         return;
       }
 
@@ -171,39 +189,37 @@ export function useClauseHighlighting({
       queue.forEach((item, index) => {
         // Step 1: Search for the text (selects it)
         const searchDelay = cumulativeDelay;
-        const searchTimer = setTimeout(() => {
+        timersRef.current.push(setTimeout(() => {
           console.log(
             `[Collabora Highlight] [${index + 1}/${queue.length}] Searching: "${item.searchText.substring(0, 50)}..." (${item.riskLevel})`
           );
           searchAndSelect(item.searchText);
-        }, searchDelay);
-        timersRef.current.push(searchTimer);
+        }, searchDelay));
 
         // Step 2: Apply background color to selection
         const colorDelay = searchDelay + SEARCH_TO_COLOR_DELAY;
-        const colorTimer = setTimeout(() => {
+        timersRef.current.push(setTimeout(() => {
           console.log(
             `[Collabora Highlight] [${index + 1}/${queue.length}] Applying color 0x${item.color.toString(16)} (${item.riskLevel})`
           );
           applyBackgroundColor(item.color);
-        }, colorDelay);
-        timersRef.current.push(colorTimer);
+        }, colorDelay));
 
         // Advance cumulative delay for the next item
         cumulativeDelay = colorDelay + COLOR_TO_NEXT_DELAY;
       });
 
       // After all highlights, move cursor back to start
+      // R6 FIX: No args — cursor command (empty {} causes dialog dispatch)
       const resetDelay = cumulativeDelay + 200;
-      const resetTimer = setTimeout(() => {
+      timersRef.current.push(setTimeout(() => {
         console.log("[Collabora Highlight] Queue complete — resetting cursor to top");
-        executeUnoCommand(".uno:GoToStartOfDoc", {});
-      }, resetDelay);
-      timersRef.current.push(resetTimer);
+        executeUnoCommand(".uno:GoToStartOfDoc");
+      }, resetDelay));
 
       // Save the document so highlights are persisted in the DOCX file
       const saveDelay = resetDelay + 300;
-      const saveTimer = setTimeout(() => {
+      timersRef.current.push(setTimeout(() => {
         console.log("[Collabora Highlight] Saving highlights to DOCX via Action_Save");
         sendMessage({
           MessageId: "Action_Save",
@@ -213,21 +229,22 @@ export function useClauseHighlighting({
             Notify: true,
           },
         });
-      }, saveDelay);
-      timersRef.current.push(saveTimer);
+      }, saveDelay));
 
-      // Notify parent that highlights are done and saved
+      // Notify parent that highlights are done
       const notifyDelay = saveDelay + 700; // Extra time for save round-trip
-      const notifyTimer = setTimeout(() => {
-        console.log("[Collabora Highlight] ✓ Highlights applied and saved to file");
+      timersRef.current.push(setTimeout(() => {
+        console.log("[Collabora Highlight] ✓ Highlights applied and saved");
         onHighlightingCompleteRef.current?.();
-      }, notifyDelay);
-      timersRef.current.push(notifyTimer);
+      }, notifyDelay));
     },
     [searchAndSelect, applyBackgroundColor, executeUnoCommand, sendMessage]
   );
 
-  // ─── Trigger highlighting after document loads ─────────────────────
+  // ─── Trigger highlighting after document loads (T018) ──────────────
+  // T018: Fire as soon as isDocumentLoaded=true AND highlights not yet applied.
+  // The iframe can be visually hidden behind the preparation overlay — postMessage
+  // still works on a mounted iframe. Do NOT wait for viewerState === 'ready'.
   useEffect(() => {
     if (!isDocumentLoaded) {
       // Reset on reload so highlights re-apply (if needed)
@@ -238,6 +255,8 @@ export function useClauseHighlighting({
     // If highlights are already baked into the DOCX, skip entirely
     if (highlightsAlreadyApplied) {
       console.log("[Collabora Highlight] Skipping — highlights already saved in DOCX");
+      // Still need to notify completion so preparation overlay is removed
+      onHighlightingCompleteRef.current?.();
       return;
     }
 
@@ -266,4 +285,6 @@ export function useClauseHighlighting({
       timersRef.current = [];
     };
   }, []);
+
+  return {};
 }

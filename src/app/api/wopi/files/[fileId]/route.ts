@@ -71,6 +71,13 @@ export async function GET(
     // backend DOCX mutation, forcing Collabora to re-fetch the file.
     const version = contract.document.updatedAt.getTime().toString();
 
+    // V1 Validation result (T001/T006): ReadOnly: true added to CheckFileInfo.
+    // Research R1/R5 confirms ReadOnly (WOPI presentation-mode flag) is distinct
+    // from UserCanWrite and does not affect the postMessage UNO command channel.
+    // Both can be true simultaneously: host app writes programmatically
+    // (UserCanWrite: true) while end user sees a read-only UI (ReadOnly: true).
+    // If .uno:ExecuteSearch stops working in your Collabora instance with
+    // ReadOnly: true, remove that field and rely on the transparent overlay only.
     const response: CheckFileInfoResponse = {
       BaseFileName: `${contract.title}.docx`,
       Size: fileSize,
@@ -79,18 +86,15 @@ export async function GET(
       UserId: tokenPayload.userId,
       UserFriendlyName: tokenPayload.userName,
 
-      // Permission flags — we set UserCanWrite: true so that Collabora enters
-      // "edit mode" internally. This is required because Collabora's read-only
-      // mode blocks `.uno:ExecuteSearch` via postMessage (it has a hardcoded
-      // allowlist). With UserCanWrite: true, search/navigation via postMessage
-      // works. Saves only happen programmatically (via Action_Save after
-      // applying a fallback redline). The document is safe because:
-      //   1. PutFile endpoint writes changes only when triggered by our code
-      //   2. We strip all editing UI (toolbar, menubar) via postMessage
-      //   3. HideSaveOption: true hides the save button from the user
+      // Permission flags — UserCanWrite: true enables programmatic UNO commands
+      // via postMessage (Collabora's read-only mode blocks the UNO command channel).
+      // ReadOnly: true instructs Collabora to present view-only UI (no edit cursor,
+      // no toolbar) without affecting postMessage. This is layer 1 of read-only
+      // enforcement; the transparent overlay in collabora-document-viewer.tsx is layer 2.
       UserCanWrite: true,
       UserCanNotWriteRelative: true,
       UserCanRename: false,
+      ReadOnly: true,
 
       // UI flags
       DisablePrint: false,

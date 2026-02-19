@@ -47,6 +47,10 @@ export interface CheckFileInfoResponse {
 
   // Optional watermark
   WatermarkText?: string | null;
+
+  // Presentation-mode flag (T006): instructs Collabora to open in view-only UI.
+  // Does NOT affect UserCanWrite or the postMessage UNO command channel.
+  ReadOnly?: boolean;
 }
 
 // ─── Collabora PostMessage Types ─────────────────────────────────────────────
@@ -55,11 +59,13 @@ export interface CheckFileInfoResponse {
 export type CollaboraOutboundMessageId =
   | 'Host_PostmessageReady'
   | 'Action_Exec'
+  | 'Send_UNO_Command'
   | 'Hide_Menu_Bar'
   | 'Hide_Status_Bar'
   | 'Show_Toolbar'
   | 'Action_Print'
-  | 'Action_Export';
+  | 'Action_Export'
+  | 'Action_Save';
 
 /** Messages received from Collabora iframe → Host */
 export type CollaboraInboundMessageId =
@@ -167,6 +173,48 @@ export interface CollaboraViewerProps {
   pendingUndoRedline?: FindingUndoRedlineData | null;
   /** Called after the undo redline has been applied and saved in the viewer */
   onUndoRedlineApplied?: () => void;
+  /** Called when anchor-based navigation fails for a clause (T015) */
+  onNavigationFailed?: (clauseId: string) => void;
+  /** Called on programmatic save failure — FR-025 (T009/T012) */
+  onSaveFailed?: (reason: string) => void;
+}
+
+// ─── Pending Document Change Queue (US6) ─────────────────────────────────────
+
+/** Type of change to apply to the DOCX via UNO command sequence */
+export type PendingChangeType = 'APPLY_FALLBACK' | 'UNDO_FALLBACK';
+
+/**
+ * Lifecycle status of a pending document change.
+ * 'in_progress': UNO command sequence started but viewer unmounted mid-operation (FR-026).
+ */
+export type PendingChangeStatus = 'pending' | 'applying' | 'in_progress' | 'complete' | 'failed';
+
+/** SPA-level transient state for a document change not yet applied via UNO commands */
+export interface PendingDocumentChange {
+  /** UUID — deduplication key */
+  id: string;
+  /** References AnalysisClause.id */
+  clauseId: string;
+  type: PendingChangeType;
+  /** Full FindingRedlineData for APPLY_FALLBACK, FindingUndoRedlineData for UNDO_FALLBACK */
+  payload: FindingRedlineData | FindingUndoRedlineData;
+  /** ISO-8601 timestamp; used for ordering */
+  decidedAt: string;
+  status: PendingChangeStatus;
+  /** Set when status === 'failed' */
+  failureReason?: string;
+}
+
+// ─── Anchor Embed Result (US5) ───────────────────────────────────────────────
+
+/** Tracks whether a clause anchor was successfully embedded during document preparation */
+export interface AnchorEmbedResult {
+  clauseId: string;
+  /** 'clause-{clauseId}' */
+  anchorName: string;
+  /** false if ExecuteSearch found no match for this clause excerpt */
+  embedded: boolean;
 }
 
 // ─── Clause Navigation ───────────────────────────────────────────────────────

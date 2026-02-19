@@ -31,7 +31,8 @@
       "Bash(for comp in accordion alert-dialog alert aspect-ratio avatar breadcrumb calendar carousel chart checkbox command context-menu drawer form hover-card input-otp menubar navigation-menu pagination popover radio-group resizable sidebar slider sonner switch toast toaster toggle-group toggle use-toast)",
       "Bash(do echo -n \"$comp: \")",
       "Bash(done)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

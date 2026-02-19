@@ -153,7 +153,10 @@ export function buildIframeUrl(
   // read-only mode blocks `.uno:ExecuteSearch` via postMessage, which breaks
   // our clause navigation. Instead we set UserCanWrite: true in WOPI
   // CheckFileInfo and rely on UI stripping + no PutFile endpoint for safety.
-  return `${viewerBaseUrl}${separator}WOPISrc=${encodedWopiSrc}&access_token=${accessToken}&closebutton=0`;
+  // ui_defaults: classic mode without the right-side Styles/Character sidebar.
+  const uiDefaults = encodeURIComponent('UIMode=classic;TextSidebar=false');
+
+  return `${viewerBaseUrl}${separator}WOPISrc=${encodedWopiSrc}&access_token=${accessToken}&closebutton=0&ui_defaults=${uiDefaults}`;
 }
 
 /**

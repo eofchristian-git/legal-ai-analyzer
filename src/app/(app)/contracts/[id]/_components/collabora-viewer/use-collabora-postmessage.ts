@@ -9,6 +9,9 @@
  * - Sending Host → Collabora messages (Hide_Menu_Bar, Hide_Status_Bar, etc.)
  * - Document load state tracking
  * - Timeout detection if document fails to load
+ *
+ * R6 FIX (T003b): executeUnoCommand filters empty object args {} to prevent
+ * dialog dispatch in LibreOffice core. See research.md §R6.
  */
 
 "use client";
@@ -56,7 +59,6 @@ export function useCollaboraPostMessage({
   const [isLoading, setIsLoading] = useState(true);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const chromeStripTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const onDocumentLoadedRef = useRef(onDocumentLoaded);
   const onErrorRef = useRef(onError);
   const postmessageReadySentRef = useRef(false);
@@ -87,6 +89,11 @@ export function useCollaboraPostMessage({
   // ─── Execute a UNO command ─────────────────────────────────────────
   // Collabora supports: { MessageId: "Send_UNO_Command", Values: { Command, Args } }
   // Args is passed directly to the internal sendUnoCommand (NOT JSON-stringified).
+  //
+  // R6 FIX: Empty object {} as Args causes Collabora to send `uno .uno:Cmd {}`
+  // which LibreOffice core interprets as "args provided but incomplete" and opens
+  // the dialog execution path (e.g. Character dialog for .uno:Strikeout).
+  // We filter empty objects so toggle/cursor commands dispatch without args.
   const executeUnoCommand = useCallback(
     (command: string, args?: Record<string, unknown>) => {
       if (!isDocumentLoaded) {
@@ -94,62 +101,20 @@ export function useCollaboraPostMessage({
         return;
       }
 
+      // R6: Only send args when they contain actual key-value pairs.
+      // Empty {} causes dialog dispatch in Collabora/LibreOffice.
+      const hasArgs = args && Object.keys(args).length > 0;
+
       sendMessage({
         MessageId: "Send_UNO_Command",
         Values: {
           Command: command,
-          Args: args || "",
+          Args: hasArgs ? args : "",
         },
       });
     },
     [sendMessage, isDocumentLoaded]
   );
-
-  // ─── Strip Collabora UI chrome ─────────────────────────────────────
-  // These MessageId values must match Collabora's bundle exactly.
-  // Since we set UserCanWrite: true (to enable search), we MUST strip
-  // the editing UI to prevent accidental edits.
-  //
-  // CRITICAL ORDER: Collapse_Notebookbar MUST be called BEFORE
-  // Hide_Menubar. Collabora's collapseNotebookbar() has a guard:
-  //   if (this.isNotebookbarCollapsed() || this.isMenubarHidden()) return;
-  // If the menubar is already hidden, the collapse is a no-op!
-  //
-  // We also need a small delay between collapse and hide because
-  // addNotebookbarUI() calls showMenubar() during init, which can
-  // override our hide. The two-phase approach ensures correctness.
-  const stripViewerChrome = useCallback(() => {
-    // Phase 1: Collapse notebookbar + hide status/ruler
-    // (menubar must still be visible for collapse to work)
-    sendMessage({ MessageId: "Collapse_Notebookbar" });
-    sendMessage({ MessageId: "Hide_StatusBar" });
-    sendMessage({ MessageId: "Hide_Ruler" });
-
-    // Phase 2: Hide menubar AFTER collapse has been processed
-    // A 50ms gap ensures the collapse message is handled first.
-    setTimeout(() => {
-      sendMessage({ MessageId: "Hide_Menubar" });
-    }, 50);
-  }, [sendMessage]);
-
-  /** Send strip commands at multiple intervals to beat async UI init.
-   *  Collabora's addNotebookbarUI() runs asynchronously after
-   *  Document_Loaded and re-shows the menubar. Retrying ensures at
-   *  least one wave arrives after the UI fully initializes. */
-  const scheduleAggressiveStrip = useCallback(() => {
-    // Clear any pending strip timers
-    chromeStripTimersRef.current.forEach(clearTimeout);
-    chromeStripTimersRef.current = [];
-
-    // Strip at escalating delays: 200ms, 800ms, 1500ms, 3000ms, 5000ms
-    const delays = [200, 800, 1500, 3000, 5000];
-    for (const delay of delays) {
-      const timer = setTimeout(() => {
-        stripViewerChrome();
-      }, delay);
-      chromeStripTimersRef.current.push(timer);
-    }
-  }, [stripViewerChrome]);
 
   // ─── Reset state (for reload) ──────────────────────────────────────
   const reset = useCallback(() => {
@@ -161,9 +126,6 @@ export function useCollaboraPostMessage({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    // Clear pending chrome strip timers
-    chromeStripTimersRef.current.forEach(clearTimeout);
-    chromeStripTimersRef.current = [];
   }, []);
 
   // ─── Listen for Collabora → Host messages ──────────────────────────
@@ -214,10 +176,16 @@ export function useCollaboraPostMessage({
               clearTimeout(timeoutRef.current);
               timeoutRef.current = null;
             }
-            // Strip UI chrome with aggressive retries — Collabora's
-            // notebookbar UI initializes asynchronously and re-shows
-            // the menubar, so a single hide call is not enough.
-            scheduleAggressiveStrip();
+            // Hide sidebar, top panel, and menubar
+            sendMessage({
+              MessageId: "Send_UNO_Command",
+              Values: { Command: ".uno:SidebarHide", Args: "" },
+            });
+            sendMessage({
+              MessageId: "Send_UNO_Command",
+              Values: { Command: ".uno:FullScreen", Args: "" },
+            });
+            sendMessage({ MessageId: "Hide_Menubar" });
             onDocumentLoadedRef.current?.();
           } else if (status === "Failed") {
             setIsLoading(false);
@@ -246,7 +214,7 @@ export function useCollaboraPostMessage({
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [collaboraOrigin, sendMessage, scheduleAggressiveStrip]);
+  }, [collaboraOrigin, sendMessage]);
 
   // ─── Load timeout detection ────────────────────────────────────────
   useEffect(() => {
