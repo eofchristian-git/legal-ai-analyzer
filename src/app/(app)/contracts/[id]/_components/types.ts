@@ -73,6 +73,8 @@ export interface AnalysisWithClauses {
   // NEW: Deviation-focused analysis fields (Feature 005)
   formatVersion?: number;   // 1 = old clause-based, 2 = new deviation-based
   totalClauses?: number;    // Total clauses in document (v2 only)
+  // Feature 010: Collabora highlighting
+  highlightsApplied?: boolean;
 }
 
 export interface ContractWithAnalysis {

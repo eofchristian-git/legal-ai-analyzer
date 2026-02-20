@@ -1,7 +1,23 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-const publicPaths = ["/login", "/signup", "/api/auth"];
+const publicPaths = ["/login", "/signup", "/api/auth", "/api/collabora/health"];
+
+// Routes called server-to-server by ONLYOFFICE Docker container (use JWT token auth, not session cookies)
+const onlyofficeServerPaths = [
+  "/api/onlyoffice/callback", // Callback from ONLYOFFICE Document Server
+  "/api/cron/cleanup-sessions", // Scheduled cleanup job
+];
+
+// Check if a path is an ONLYOFFICE download route: /api/contracts/[id]/download
+function isDocumentDownloadPath(pathname: string): boolean {
+  return /^\/api\/contracts\/[^/]+\/download/.test(pathname);
+}
+
+// Routes called server-to-server by Collabora Docker container (use WOPI access_token, not session cookies)
+function isWopiPath(pathname: string): boolean {
+  return pathname.startsWith("/api/wopi/");
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -11,8 +27,16 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Allow API auth routes
-  if (pathname.startsWith("/api/auth")) {
+  // Allow Collabora WOPI server-to-server routes (authenticated via WOPI access_token query param)
+  if (isWopiPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Allow ONLYOFFICE server-to-server routes (they use JWT token auth, not session cookies)
+  if (
+    onlyofficeServerPaths.some((path) => pathname.startsWith(path)) ||
+    isDocumentDownloadPath(pathname)
+  ) {
     return NextResponse.next();
   }
 

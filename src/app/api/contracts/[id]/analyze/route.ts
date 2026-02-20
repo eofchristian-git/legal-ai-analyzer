@@ -4,8 +4,140 @@ import { buildContractReviewPrompt } from "@/lib/prompts";
 import { analyzeWithClaude } from "@/lib/claude";
 import { parseContractAnalysis } from "@/lib/analysis-parser";
 import { getSessionOrUnauthorized } from "@/lib/auth-utils";
+import fs from "fs/promises";
+// Feature 008: Import document conversion utilities
+import { convertDocument, detectFormat } from "@/lib/document-converter";
+import { calculatePositions, injectClauseMarkers } from "@/lib/position-mapper";
+import { sanitizeHTML } from "@/lib/html-sanitizer";
 
 export const maxDuration = 180; // Allow up to 3 minutes for Claude to respond
+
+/**
+ * Feature 008: Trigger document conversion after analysis completes
+ * Calls conversion functions directly (no HTTP request needed)
+ */
+async function triggerDocumentConversion(
+  contractId: string,
+  filePath: string,
+  filename: string
+): Promise<void> {
+  try {
+    console.log(`[DocConversion] Starting conversion for contract ${contractId}`);
+    
+    // Create ContractDocument record with 'processing' status
+    await db.contractDocument.upsert({
+      where: { contractId },
+      create: {
+        contractId,
+        originalPdfPath: filePath,
+        pageCount: 0,
+        conversionStatus: 'processing',
+      },
+      update: {
+        conversionStatus: 'processing',
+        conversionError: null,
+      },
+    });
+    
+    // Read the file from disk
+    const fileBuffer = await fs.readFile(filePath);
+    
+    // Detect format and convert document
+    const format = detectFormat(filename);
+    const conversionResult = await convertDocument({
+      fileBuffer,
+      format,
+      contractId,
+    });
+    
+    // Sanitize HTML
+    const sanitizedHTML = sanitizeHTML(conversionResult.html);
+    
+    // Fetch clauses for position mapping
+    const contract = await db.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        analysis: {
+          include: {
+            clauses: {
+              include: {
+                findings: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    
+    if (!contract?.analysis?.clauses) {
+      throw new Error('Contract has no analysis data for position mapping');
+    }
+    
+    // Inject clause markers for position mapping
+    const markedHTML = injectClauseMarkers(
+      sanitizedHTML,
+      contract.analysis.clauses.map(c => ({
+        id: c.id,
+        clauseNumber: c.clauseNumber,
+        clauseText: c.clauseText,
+      }))
+    );
+    
+    // Calculate positions (using simplified algorithm for now)
+    const positions = await calculatePositions({
+      html: markedHTML,
+      documentId: contractId,
+      clauses: contract.analysis.clauses.map(c => ({
+        id: c.id,
+        clauseNumber: c.clauseNumber,
+        clauseText: c.clauseText,
+      })),
+      findings: contract.analysis.clauses.flatMap(c =>
+        c.findings.map(f => ({
+          id: f.id,
+          clauseId: c.id,
+          excerpt: f.excerpt || '',
+        }))
+      ),
+    });
+    
+    // Update ContractDocument with results
+    await db.contractDocument.update({
+      where: { contractId },
+      data: {
+        htmlContent: sanitizedHTML,
+        pageCount: conversionResult.pageCount || 1,
+        clausePositions: JSON.stringify(positions.clausePositions),
+        findingPositions: JSON.stringify(positions.findingPositions),
+        conversionStatus: 'completed',
+        conversionError: null,
+      },
+    });
+    
+    console.log(`[DocConversion] Completed for contract ${contractId}`);
+  } catch (error) {
+    console.error(`[DocConversion] Failed for contract ${contractId}:`, error);
+    
+    // Try to update the ContractDocument status to 'failed'
+    try {
+      const existingDoc = await db.contractDocument.findUnique({
+        where: { contractId },
+      });
+      
+      if (existingDoc) {
+        await db.contractDocument.update({
+          where: { id: existingDoc.id },
+          data: {
+            conversionStatus: 'failed',
+            conversionError: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+      }
+    } catch (dbError) {
+      console.error(`[DocConversion] Failed to update status:`, dbError);
+    }
+  }
+}
 
 /**
  * Run the actual analysis work in the background.
@@ -365,6 +497,13 @@ async function runAnalysis(id: string, userId: string | null) {
         },
       });
     }
+
+    // Feature 008: Trigger document conversion (fire-and-forget)
+    // This will convert the document to HTML and calculate positions for the document viewer
+    triggerDocumentConversion(id, contract.document.filePath, contract.document.filename).catch((err) => {
+      console.error(`[Analyze] Failed to trigger document conversion for contract ${id}:`, err);
+      // Don't fail the analysis if conversion fails - viewer will show error state
+    });
   } catch (error) {
     console.error(`[Analyze] Background analysis failed for contract ${id}:`, error);
 

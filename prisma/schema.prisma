@@ -44,8 +44,40 @@ model Contract {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  analysis     ContractAnalysis?
-  activityLogs ActivityLog[]
+  analysis         ContractAnalysis?
+  activityLogs     ActivityLog[]
+  contractDocument ContractDocument?  // DEPRECATED: Document viewer data (Feature 008)
+  onlyOfficeSessions OnlyOfficeSession[] // NEW: ONLYOFFICE sessions (Feature 009)
+}
+
+// NEW: ContractDocument model for document viewer (Feature 008)
+model ContractDocument {
+  id                String   @id @default(cuid())
+  contractId        String   @unique
+  contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
+  // Original document
+  originalPdfPath   String
+  
+  // Converted content
+  htmlContent       String?  // Nullable until conversion completes
+  pageCount         Int
+  
+  // Position mappings (stored as JSON)
+  clausePositions   String   @default("[]")  // JSON array of ClausePosition
+  findingPositions  String   @default("[]")  // JSON array of FindingPosition
+  
+  // Conversion status
+  conversionStatus  String   @default("pending")  // 'pending' | 'processing' | 'completed' | 'failed'
+  conversionError   String?
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([contractId])
+  @@index([conversionStatus])
+  @@index([createdAt])
 }
 
 model ContractAnalysis {
@@ -78,6 +110,9 @@ model ContractAnalysis {
   // NEW: Deviation-focused analysis fields (Feature 005)
   formatVersion       Int               @default(1)  // 1 = old clause-based, 2 = new deviation-based
   totalClauses        Int               @default(0)  // Total clauses in document (v2 only)
+
+  // Feature 010: Collabora viewer — risk-level highlights baked into the DOCX
+  highlightsApplied   Boolean           @default(false)
 
   clauses           AnalysisClause[]
   negotiationItems  NegotiationItem[]
@@ -385,4 +420,37 @@ model User {
   clientsCreated             Client[]            @relation("ClientsCreated")
   clientContractsUploaded    ClientContract[]    @relation("ClientContractsUploaded")
   decisions                  ClauseDecision[]    @relation("ClauseDecisions")  // NEW: Decision history (Feature 006)
+  onlyOfficeSessions         OnlyOfficeSession[] @relation("UserSessions")     // NEW: ONLYOFFICE sessions (Feature 009)
+}
+
+// NEW: ONLYOFFICE Document Viewer session tracking (Feature 009)
+model OnlyOfficeSession {
+  id                String   @id @default(cuid())
+  contractId        String
+  contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  // ONLYOFFICE identifiers
+  documentKey       String   @unique
+
+  // Authentication tokens
+  accessToken       String   // JWT token for ONLYOFFICE authentication (4h expiry)
+  downloadToken     String   // JWT token for document download (1h expiry)
+
+  // Session configuration
+  mode              String   // 'view' | 'edit'
+  status            String   @default("active")  // 'active' | 'expired' | 'revoked'
+
+  // Timestamps
+  expiresAt         DateTime
+  lastRefreshedAt   DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([contractId])
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
 }

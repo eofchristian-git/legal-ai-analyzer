@@ -1,0 +1,147 @@
+# Viewer Session API — Collabora Online Integration
+# These are the host-app endpoints the React frontend calls to initialize
+# the Collabora viewer, check health, and manage navigation.
+
+openapi: '3.0.3'
+info:
+  title: Collabora Viewer Session API
+  version: '1.0.0'
+  description: |
+    API endpoints called by the React frontend to:
+    1. Initialize a viewing session (get iframe URL + access token)
+    2. Check Collabora server health
+    
+    These are NOT WOPI endpoints — they are app-specific endpoints
+    consumed by the frontend.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /api/collabora/session:
+    post:
+      operationId: createViewerSession
+      summary: Create a Collabora viewer session
+      description: |
+        Authenticates the user (via NextAuth session cookie), validates access
+        to the contract, generates a WOPI access token, resolves the Collabora
+        iframe URL from the discovery endpoint, and returns everything the
+        frontend needs to render the iframe.
+        
+        Replaces: POST /api/onlyoffice/token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSessionResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: No access to this contract
+        '404':
+          description: Contract or document not found
+        '503':
+          description: Collabora server unavailable
+
+  /api/collabora/health:
+    get:
+      operationId: checkCollaboraHealth
+      summary: Check Collabora server availability
+      description: |
+        Probes the Collabora /hosting/discovery endpoint to verify the
+        server is running and responsive.
+        
+        Replaces: GET /api/onlyoffice/health
+      responses:
+        '200':
+          description: Collabora is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Collabora is unavailable
+
+components:
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required:
+        - contractId
+      properties:
+        contractId:
+          type: string
+          description: ID of the contract to view
+          example: "cmlr27xb80002csdxtv6fduq4"
+
+    CreateSessionResponse:
+      type: object
+      required:
+        - iframeUrl
+        - accessToken
+        - fileId
+        - collaboraOrigin
+      properties:
+        iframeUrl:
+          type: string
+          description: |
+            Full URL to set as the iframe `src`. Includes the Collabora
+            viewer URL, WOPISrc parameter, and access_token parameter.
+          example: "http://localhost:9980/browser/dist/cool.html?WOPISrc=http%3A%2F%2Fhost.docker.internal%3A3000%2Fapi%2Fwopi%2Ffiles%2Fcmlr27xb80002csdxtv6fduq4&access_token=eyJhbG..."
+        accessToken:
+          type: string
+          description: JWT access token (also embedded in iframeUrl)
+          example: "eyJhbGciOiJIUzI1NiIs..."
+        accessTokenTtl:
+          type: integer
+          description: Token time-to-live in milliseconds
+          example: 14400000
+        fileId:
+          type: string
+          description: The contract/file ID
+          example: "cmlr27xb80002csdxtv6fduq4"
+        collaboraOrigin:
+          type: string
+          description: |
+            Origin of the Collabora server. Used by the frontend to
+            validate postMessage origins and send postMessage commands.
+          example: "http://localhost:9980"
+        fileVersion:
+          type: string
+          description: |
+            Current file version string. Can be compared after
+            mutation to determine if reload is needed.
+          example: "1708281234567"
+
+    HealthResponse:
+      type: object
+      required:
+        - healthy
+        - serverUrl
+      properties:
+        healthy:
+          type: boolean
+          description: Whether Collabora is responding
+          example: true
+        serverUrl:
+          type: string
+          description: Collabora server URL being checked
+          example: "http://localhost:9980"
+        discoveryAvailable:
+          type: boolean
+          description: Whether the WOPI discovery endpoint is accessible
+          example: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Time of the health check
+          example: "2026-02-18T12:00:00.000Z"

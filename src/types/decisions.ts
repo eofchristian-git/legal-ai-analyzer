@@ -60,6 +60,8 @@ export interface FindingStatusEntry {
   notes: Array<{ text: string; timestamp: Date; userName: string }>;
   lastActionType: DecisionActionType | null;
   lastActionTimestamp: Date | null;
+  /** The replacement text applied via APPLY_FALLBACK or EDIT_MANUAL (null otherwise) */
+  replacementText: string | null;
 }
 
 // ============================================================================
