@@ -1,4 +1,7 @@
 /**
+ * @deprecated Collabora-specific endpoint. Deprecated by Feature 012 (PDF viewer).
+ * The PDF viewer uses React overlay layers — no "baked highlights" step needed.
+ *
  * Highlights Applied Endpoint
  * POST /api/contracts/[id]/highlights-applied
  *

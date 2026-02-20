@@ -32,7 +32,8 @@
       "Bash(do echo -n \"$comp: \")",
       "Bash(done)",
       "Bash(findstr:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(soffice:*)"
     ]
   }
 }

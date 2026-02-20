@@ -55,28 +55,38 @@ model ContractDocument {
   id                String   @id @default(cuid())
   contractId        String   @unique
   contract          Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  
+
   // Original document
   originalPdfPath   String
-  
+
   // Converted content
   htmlContent       String?  // Nullable until conversion completes
   pageCount         Int
-  
+
   // Position mappings (stored as JSON)
   clausePositions   String   @default("[]")  // JSON array of ClausePosition
   findingPositions  String   @default("[]")  // JSON array of FindingPosition
-  
+
   // Conversion status
   conversionStatus  String   @default("pending")  // 'pending' | 'processing' | 'completed' | 'failed'
   conversionError   String?
-  
+
+  // NEW: PDF viewer pipeline (Feature 012)
+  pdfPath                  String?   // Absolute path to LibreOffice-converted PDF file
+  pdfPageCount             Int?      // Total pages in the PDF
+  textPositions            String?   // JSON: TextPosition[] — character-level coordinates per page
+  clausePositionMappings   String?   // JSON: ClausePdfMapping[] — clause → page/rect
+  findingPositionMappings  String?   // JSON: FindingPdfMapping[] — finding → page/rects + riskLevel
+  pdfConversionStatus      String    @default("pending")  // 'pending' | 'converting' | 'extracting' | 'mapping' | 'completed' | 'failed'
+  pdfConversionError       String?   // Error message if conversion/extraction failed
+
   // Timestamps
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
+
   @@index([contractId])
   @@index([conversionStatus])
+  @@index([pdfConversionStatus])
   @@index([createdAt])
 }
 
@@ -111,7 +121,8 @@ model ContractAnalysis {
   formatVersion       Int               @default(1)  // 1 = old clause-based, 2 = new deviation-based
   totalClauses        Int               @default(0)  // Total clauses in document (v2 only)
 
-  // Feature 010: Collabora viewer — risk-level highlights baked into the DOCX
+  // Feature 010: Collabora viewer flag — deprecated by Feature 012 (PDF viewer)
+  // TODO T042: Remove this field once Collabora viewer code is deleted
   highlightsApplied   Boolean           @default(false)
 
   clauses           AnalysisClause[]

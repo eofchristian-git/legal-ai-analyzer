@@ -1,7 +1,7 @@
 'use client';
 
-// Feature 008: Interactive Document Viewer & Redline Export
-// Modal for selecting export format and triggering download (T042)
+// Feature 012: Original-File Export with Track Changes
+// Replaces Feature 008 reconstructed DOCX export (T031)
 
 import React, { useState } from 'react';
 import {
@@ -26,6 +26,30 @@ interface RedlineExportModalProps {
 
 type ExportFormat = 'docx' | 'pdf';
 
+interface ExportOption {
+  fmt: ExportFormat;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
+const EXPORT_OPTIONS: ExportOption[] = [
+  {
+    fmt: 'docx',
+    label: 'Original with Changes (.docx)',
+    description:
+      'Original file with native Word Track Changes (Accept/Reject) and margin comments. Author: Legal AI Analyzer.',
+    icon: <FileText className="h-4 w-4 text-blue-600" />,
+  },
+  {
+    fmt: 'pdf',
+    label: 'Annotated PDF (.pdf)',
+    description:
+      'PDF with risk highlights, strikethrough on replaced text, and note annotations baked in. Opens in any PDF reader.',
+    icon: <FileDown className="h-4 w-4 text-red-600" />,
+  },
+];
+
 export function RedlineExportModal({
   open,
   onOpenChange,
@@ -38,34 +62,30 @@ export function RedlineExportModal({
   async function handleExport() {
     setExporting(true);
     try {
-      const response = await fetch(`/api/contracts/${contractId}/export-redline`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ format }),
-      });
+      // Feature 012: Use new export-modified endpoint
+      const url = `/api/contracts/${contractId}/export-modified?format=${format}`;
+      const response = await fetch(url);
 
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({ error: 'Export failed' }));
         throw new Error(err.error || 'Export failed');
       }
 
-      // T056: Trigger file download
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `redline-${contractTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.${format}`;
+      a.href = objectUrl;
+      const safeTitle = contractTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      a.download = `${safeTitle}-reviewed.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
 
-      toast.success(`Redline exported as ${format.toUpperCase()}`);
+      toast.success(`Document exported as ${format.toUpperCase()}`);
       onOpenChange(false);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Export failed'
-      );
+      toast.error(error instanceof Error ? error.message : 'Export failed');
     } finally {
       setExporting(false);
     }
@@ -73,26 +93,25 @@ export function RedlineExportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Export Redline Document</DialogTitle>
+          <DialogTitle>Export Contract with Changes</DialogTitle>
           <DialogDescription>
-            Generate a document with all tracked changes from this contract review.
-            Deleted text will appear with strikethrough, inserted text with underline.
+            Export the original document with all applied triage decisions as track changes and comments.
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
           <p className="text-sm font-medium mb-3">Export format:</p>
           <div className="space-y-3">
-            {(['docx', 'pdf'] as ExportFormat[]).map((fmt) => (
+            {EXPORT_OPTIONS.map((option) => (
               <button
-                key={fmt}
+                key={option.fmt}
                 type="button"
-                onClick={() => setFormat(fmt)}
+                onClick={() => setFormat(option.fmt)}
                 className={cn(
                   'w-full flex items-start gap-3 p-3 border rounded-md text-left transition-colors',
-                  format === fmt
+                  format === option.fmt
                     ? 'border-primary bg-primary/5'
                     : 'hover:bg-muted/30 border-border'
                 )}
@@ -100,12 +119,12 @@ export function RedlineExportModal({
                 <div
                   className={cn(
                     'mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0',
-                    format === fmt
+                    format === option.fmt
                       ? 'border-primary bg-primary'
                       : 'border-muted-foreground/40'
                   )}
                 >
-                  {format === fmt && (
+                  {format === option.fmt && (
                     <div className="h-full w-full flex items-center justify-center">
                       <div className="h-1.5 w-1.5 rounded-full bg-white" />
                     </div>
@@ -113,17 +132,11 @@ export function RedlineExportModal({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 font-medium text-sm">
-                    {fmt === 'docx' ? (
-                      <FileText className="h-4 w-4 text-blue-600" />
-                    ) : (
-                      <FileDown className="h-4 w-4 text-red-600" />
-                    )}
-                    {fmt === 'docx' ? 'Word Document (.docx)' : 'PDF Document (.pdf)'}
+                    {option.icon}
+                    {option.label}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {fmt === 'docx'
-                      ? 'Visual redline with strikethrough and underline formatting. Compatible with Microsoft Word.'
-                      : 'Fixed-format redline. Best for sharing with external parties.'}
+                    {option.description}
                   </p>
                 </div>
               </button>
@@ -143,12 +156,12 @@ export function RedlineExportModal({
             {exporting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Generating...
+                Generating…
               </>
             ) : (
               <>
                 <FileDown className="h-4 w-4" />
-                Export {format.toUpperCase()}
+                Export {format === 'docx' ? 'DOCX' : 'PDF'}
               </>
             )}
           </Button>

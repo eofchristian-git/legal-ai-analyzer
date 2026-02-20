@@ -14,10 +14,12 @@ function isDocumentDownloadPath(pathname: string): boolean {
   return /^\/api\/contracts\/[^/]+\/download/.test(pathname);
 }
 
-// Routes called server-to-server by Collabora Docker container (use WOPI access_token, not session cookies)
-function isWopiPath(pathname: string): boolean {
-  return pathname.startsWith("/api/wopi/");
-}
+// Feature 012: WOPI path check removed (Collabora deprecated).
+// Keeping isWopiPath as a no-op stub to preserve any existing WOPI routes during transition.
+// T041: Remove WOPI middleware path exception
+// function isWopiPath(pathname: string): boolean {
+//   return pathname.startsWith("/api/wopi/");
+// }
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -27,10 +29,8 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Allow Collabora WOPI server-to-server routes (authenticated via WOPI access_token query param)
-  if (isWopiPath(pathname)) {
-    return NextResponse.next();
-  }
+  // Feature 012 T041: WOPI path exception removed (Collabora deprecated).
+  // WOPI routes now require authentication like all other routes.
 
   // Allow ONLYOFFICE server-to-server routes (they use JWT token auth, not session cookies)
   if (

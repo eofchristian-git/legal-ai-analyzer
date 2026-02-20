@@ -1,4 +1,8 @@
 /**
+ * @deprecated Deprecated by Feature 012 (PDF viewer). Use pdf-viewer/ instead.
+ * The new PDF viewer replaces this Collabora-based viewer with a zero-dependency
+ * read-only PDF.js renderer + React overlay layers for risk highlights and annotations.
+ *
  * Collabora Document Viewer — Main Component
  * Feature 010 T013 + Feature 011 T007/T015/T016/T017/T018/T019/T022
  *

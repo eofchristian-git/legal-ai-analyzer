@@ -154,7 +154,7 @@ export function buildIframeUrl(
   // our clause navigation. Instead we set UserCanWrite: true in WOPI
   // CheckFileInfo and rely on UI stripping + no PutFile endpoint for safety.
   // ui_defaults: classic mode without the right-side Styles/Character sidebar.
-  const uiDefaults = encodeURIComponent('UIMode=classic;TextSidebar=false');
+  const uiDefaults = encodeURIComponent('UIMode=classic;TextSidebar=false;Navigator=false');
 
   return `${viewerBaseUrl}${separator}WOPISrc=${encodedWopiSrc}&access_token=${accessToken}&closebutton=0&ui_defaults=${uiDefaults}`;
 }

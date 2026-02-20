@@ -3,7 +3,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ArrowUpDown, Filter, CheckCircle2, AlertTriangle, CheckCheck } from "lucide-react";
+import { ArrowUpDown, Filter, CheckCircle2, AlertTriangle, CheckCheck, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +23,8 @@ interface ClauseListProps {
     totalFindingCount: number;
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>;
+  /** Feature 012: Set of clause IDs that could not be mapped to PDF positions */
+  unmappedClauseIds?: Set<string>;
 }
 
 function getMaxRisk(findings: { riskLevel: string }[]): string {
@@ -45,7 +47,7 @@ type RiskFilter = "ALL" | "RED" | "YELLOW" | "GREEN";
 type SortMode = "position" | "risk" | "triage";
 type ResolutionFilter = "ALL" | "PENDING" | "IN_PROGRESS" | "RESOLVED" | "ESCALATED";
 
-export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClause, clauseProjections = {} }: ClauseListProps) {
+export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClause, clauseProjections = {}, unmappedClauseIds }: ClauseListProps) {
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("ALL");
   const [sortMode, setSortMode] = useState<SortMode>("position");
   const [resolutionFilter, setResolutionFilter] = useState<ResolutionFilter>("ALL");
@@ -205,6 +207,7 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
             const resolvedCount = projection?.resolvedCount ?? 0;
             const totalFindingCount = projection?.totalFindingCount ?? findingCount;
             const effectiveStatus = projection?.effectiveStatus;
+            const isUnmapped = unmappedClauseIds?.has(clause.id) ?? false;
             
             return (
               <button
@@ -234,6 +237,13 @@ export function ClauseList({ clauses, selectedClauseId, finalized, onSelectClaus
                     )}
                   </span>
                   <div className="flex items-center gap-1.5">
+                    {/* Feature 012: Unmapped PDF position indicator */}
+                    {isUnmapped && (
+                      <MapPin
+                        className="h-3 w-3 text-amber-500 opacity-70"
+                        aria-label="Could not locate this clause in the PDF document"
+                      />
+                    )}
                     {/* T012: Resolution progress indicator */}
                     {totalFindingCount > 0 && projection && (
                       <span className={cn(

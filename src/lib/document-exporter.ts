@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by src/lib/docx-modifier.ts (Feature 012).
+ * Use /api/contracts/[id]/export-modified instead of /api/contracts/[id]/export-redline.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // Generates a redline export that is the original contract with:
 //   · Changes applied during triage shown as tracked changes (del/ins)

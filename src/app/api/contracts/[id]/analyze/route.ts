@@ -9,6 +9,8 @@ import fs from "fs/promises";
 import { convertDocument, detectFormat } from "@/lib/document-converter";
 import { calculatePositions, injectClauseMarkers } from "@/lib/position-mapper";
 import { sanitizeHTML } from "@/lib/html-sanitizer";
+// Feature 012: PDF pipeline
+import { runPdfPipeline } from "@/lib/pdf-pipeline";
 
 export const maxDuration = 180; // Allow up to 3 minutes for Claude to respond
 
@@ -503,6 +505,12 @@ async function runAnalysis(id: string, userId: string | null) {
     triggerDocumentConversion(id, contract.document.filePath, contract.document.filename).catch((err) => {
       console.error(`[Analyze] Failed to trigger document conversion for contract ${id}:`, err);
       // Don't fail the analysis if conversion fails - viewer will show error state
+    });
+
+    // Feature 012: Trigger PDF pipeline (fire-and-forget)
+    // Converts DOCX → PDF, extracts text positions, maps clauses/findings
+    runPdfPipeline(id).catch((err) => {
+      console.error(`[Analyze] Failed to trigger PDF pipeline for contract ${id}:`, err);
     });
   } catch (error) {
     console.error(`[Analyze] Background analysis failed for contract ${id}:`, error);

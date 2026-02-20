@@ -1,3 +1,8 @@
+/**
+ * @deprecated Replaced by /api/contracts/[id]/export-modified (Feature 012).
+ * This endpoint uses the reconstructed DOCX approach (document-exporter.ts).
+ * The new endpoint uses the original DOCX with native Word Track Changes.
+ */
 // Feature 008: Interactive Document Viewer & Redline Export
 // API endpoint to generate redline exports (Word or PDF) (T039)
 

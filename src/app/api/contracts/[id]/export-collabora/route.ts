@@ -1,3 +1,7 @@
+/**
+ * @deprecated Collabora export endpoint. Deprecated by Feature 012.
+ * Use /api/contracts/[id]/export-modified for the new original-file export with Track Changes.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import { db } from "@/lib/db";

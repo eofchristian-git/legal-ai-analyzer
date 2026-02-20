@@ -1,4 +1,7 @@
 /**
+ * @deprecated Collabora session endpoint. Deprecated by Feature 012 (PDF viewer).
+ * The new PDF viewer uses pdfjs-dist with no external service.
+ *
  * Collabora Viewer Session Endpoint
  * Feature 010 T010: POST /api/collabora/session
  *

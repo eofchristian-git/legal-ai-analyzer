@@ -40,10 +40,12 @@ import { OnlyOfficeDocumentViewer } from "./_components/onlyoffice-viewer/onlyof
 import { CollaboraDocumentViewer } from "./_components/collabora-viewer";
 import { CollaboraPendingQueueProvider } from "./_components/collabora-viewer/use-pending-document-queue";
 import { RedlineExportModal } from "./_components/redline-export-modal";
+import { PdfViewer, type PdfViewerHandle } from "./_components/pdf-viewer";
 import type { ContractWithAnalysis, TriageDecision } from "./_components/types";
 import type { ProjectionResult } from "@/types/decisions";
 import type { TrackChangeData } from "@/types/onlyoffice";
 import type { ClauseNavigationData, FindingRedlineData, FindingUndoRedlineData } from "@/types/collabora";
+import type { PdfDocumentResponse } from "@/types/pdf-viewer";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -73,7 +75,7 @@ export default function ContractDetailPage() {
     totalFindingCount: number;
     effectiveStatus: 'PENDING' | 'PARTIALLY_RESOLVED' | 'RESOLVED' | 'ESCALATED' | 'NO_ISSUES';
   }>>({});
-  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'onlyoffice' | 'collabora'>('clause');
+  const [documentViewMode, setDocumentViewMode] = useState<'clause' | 'onlyoffice' | 'collabora' | 'pdf'>('clause');
   // Tracked changes from APPLY_FALLBACK / EDIT_MANUAL decisions for ONLYOFFICE viewer
   const [onlyOfficeTrackChanges, setOnlyOfficeTrackChanges] = useState<TrackChangeData[]>([]);
   // Collabora reload trigger — increment to force viewer reload after backend DOCX mutation
@@ -84,6 +86,19 @@ export default function ContractDetailPage() {
   const [pendingUndoRedline, setPendingUndoRedline] = useState<FindingUndoRedlineData | null>(null);
   // T043: Redline export modal state
   const [redlineExportOpen, setRedlineExportOpen] = useState(false);
+  // Feature 012: PDF viewer state
+  const [pdfDocumentData, setPdfDocumentData] = useState<PdfDocumentResponse | null>(null);
+  const [pdfDocumentLoading, setPdfDocumentLoading] = useState(false);
+  const [pdfFetchKey, setPdfFetchKey] = useState(0);
+  // Separate navigation intent (user click) from active-clause highlight (scroll sync)
+  const [pdfNavigationTarget, setPdfNavigationTarget] = useState<{ clauseId: string; key: number } | null>(null);
+  const pdfViewerRef = useRef<PdfViewerHandle>(null);
+  // Feature 012: Finding projections for PDF overlays (findingId → projection info)
+  const [findingProjections, setFindingProjections] = useState<Map<string, {
+    appliedFallbackText?: string;
+    notes?: string[];
+    aiSummary?: string;
+  }>>(new Map());
   const autoAnalyzeTriggered = useRef(false);
   const analyzeStartTime = useRef<number | null>(null);
   const isRedirecting = useRef(false);
@@ -294,6 +309,82 @@ export default function ContractDetailPage() {
     setIsEditMode(false);
   }, [selectedClauseId]);
 
+  // Feature 012: Fetch PDF document data when switching to PDF view mode + poll while in progress
+  useEffect(() => {
+    if (documentViewMode !== 'pdf' || !contract?.analysis) return;
+
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    async function fetchPdfData() {
+      if (!pdfDocumentData) setPdfDocumentLoading(true);
+      try {
+        const res = await fetch(`/api/contracts/${params.id}/pdf-document`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setPdfDocumentData(data);
+          // Poll every 3s while pipeline is in progress
+          const inProgress = ['converting', 'extracting', 'mapping'].includes(data.conversionStatus);
+          if (inProgress) {
+            pollTimer = setTimeout(fetchPdfData, 3000);
+          }
+        }
+      } catch {
+        // Non-critical
+      } finally {
+        if (!cancelled) setPdfDocumentLoading(false);
+      }
+    }
+
+    fetchPdfData();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentViewMode, contract?.analysis, params.id, pdfFetchKey]);
+
+  // Feature 012: Build finding projections map for PDF overlays
+  useEffect(() => {
+    if (!contract?.analysis?.clauses) return;
+
+    const buildFindingProjections = async () => {
+      const projMap = new Map<string, {
+        appliedFallbackText?: string;
+        notes?: string[];
+        aiSummary?: string;
+      }>();
+
+      for (const clause of contract.analysis!.clauses) {
+        try {
+          const res = await fetch(`/api/clauses/${clause.id}/projection`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const proj = data.projection;
+          if (!proj?.findingStatuses) continue;
+
+          for (const finding of clause.findings) {
+            const status = proj.findingStatuses[finding.id];
+            if (!status) continue;
+            projMap.set(finding.id, {
+              appliedFallbackText: status.replacementText ?? undefined,
+              notes: status.notes?.map((n: { text: string }) => n.text) ?? [],
+              aiSummary: finding.summary,
+            });
+          }
+        } catch {
+          // Skip clause on error
+        }
+      }
+
+      setFindingProjections(projMap);
+    };
+
+    buildFindingProjections();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract?.analysis?.clauses, historyRefreshKey]);
+
   async function cancelAnalysis() {
     try {
       await fetch(`/api/contracts/${params.id}/analyze`, {
@@ -475,6 +566,13 @@ export default function ContractDetailPage() {
   const yellowCount = analysis?.yellowCount ?? 0;
   const greenCount = analysis?.greenCount ?? 0;
 
+  // Feature 012: Unmapped clause IDs (for clause list indicator)
+  const unmappedClauseIds = new Set(
+    pdfDocumentData?.clauseMappings
+      ?.filter((m) => m.unmapped)
+      .map((m) => m.clauseId) ?? []
+  );
+
   // T021: Wrap with CollaboraPendingQueueProvider so the queue persists
   // during SPA navigation within the contract review page.
   const contractId = params.id as string;
@@ -518,16 +616,16 @@ export default function ContractDetailPage() {
                     <FileText className="h-4 w-4" />
                     PDF
                   </Button>
-                  {/* T043: Export Redline button — gated on finalization */}
+                  {/* T043: Export Redline button — opens modal with format selection */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleCollaboraExport}
+                    onClick={() => setRedlineExportOpen(true)}
                     disabled={!contract?.analysis?.finalized}
                     className="gap-1.5"
                     title={
                       contract?.analysis?.finalized
-                        ? "Download the Collabora-edited document with tracked changes"
+                        ? "Download the original document with tracked changes and comments"
                         : "Finalize the contract review to enable export"
                     }
                   >
@@ -612,8 +710,15 @@ export default function ContractDetailPage() {
                       clauses={analysis.clauses}
                       selectedClauseId={selectedClauseId}
                       finalized={isFinalized}
-                      onSelectClause={setSelectedClauseId}
+                      onSelectClause={(id) => {
+                        setSelectedClauseId(id);
+                        // Only trigger PDF scroll on explicit user click
+                        if (documentViewMode === 'pdf') {
+                          setPdfNavigationTarget((prev) => ({ clauseId: id, key: (prev?.key ?? 0) + 1 }));
+                        }
+                      }}
                       clauseProjections={clauseProjections}
+                      unmappedClauseIds={documentViewMode === 'pdf' ? unmappedClauseIds : undefined}
                     />
                   </div>
                 </ResizablePanel>
@@ -625,7 +730,7 @@ export default function ContractDetailPage() {
                   <div className="h-full overflow-hidden flex flex-col">
                     {/* View mode toggle */}
                     {analysis && (
-                      <div className="p-2 border-b flex gap-2">
+                      <div className="p-2 border-b flex gap-2 flex-wrap">
                         <Button
                           variant={documentViewMode === 'clause' ? 'default' : 'outline'}
                           size="sm"
@@ -640,11 +745,89 @@ export default function ContractDetailPage() {
                         >
                           Document View
                         </Button>
+                        <Button
+                          variant={documentViewMode === 'pdf' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setDocumentViewMode('pdf')}
+                          title="PDF viewer with risk highlights and navigation"
+                        >
+                          PDF View
+                        </Button>
                       </div>
                     )}
                     
                     {/* Render based on view mode */}
-                    {documentViewMode === 'collabora' ? (
+                    {documentViewMode === 'pdf' && (
+                      <>
+                        {pdfDocumentLoading && (
+                          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading document…
+                          </div>
+                        )}
+                        {!pdfDocumentLoading && pdfDocumentData && pdfDocumentData.conversionStatus === 'completed' && pdfDocumentData.pdfUrl && (
+                          <PdfViewer
+                            ref={pdfViewerRef}
+                            pdfUrl={pdfDocumentData.pdfUrl}
+                            pageCount={pdfDocumentData.pageCount}
+                            clauseMappings={pdfDocumentData.clauseMappings}
+                            findingMappings={pdfDocumentData.findingMappings}
+                            selectedClauseId={selectedClauseId}
+                            navigationTarget={pdfNavigationTarget}
+                            findingProjections={findingProjections}
+                            onActiveClauseChange={(clauseId) => {
+                              if (clauseId && clauseId !== selectedClauseId) {
+                                setSelectedClauseId(clauseId);
+                              }
+                            }}
+                          />
+                        )}
+                        {!pdfDocumentLoading && pdfDocumentData && (pdfDocumentData.conversionStatus === 'converting' || pdfDocumentData.conversionStatus === 'extracting' || pdfDocumentData.conversionStatus === 'mapping') && (
+                          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <p className="text-sm">Preparing document…</p>
+                            <p className="text-xs opacity-60 capitalize">{pdfDocumentData.conversionStatus}…</p>
+                          </div>
+                        )}
+                        {!pdfDocumentLoading && pdfDocumentData && pdfDocumentData.conversionStatus === 'pending' && (
+                          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3 p-6">
+                            <FileText className="h-8 w-8 opacity-40" />
+                            <p className="text-sm font-medium">PDF view not yet prepared</p>
+                            <p className="text-xs opacity-60 text-center max-w-xs">Click below to generate the PDF view with risk highlights. This runs once and takes 10–30 seconds.</p>
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                setPdfDocumentLoading(true);
+                                try {
+                                  await fetch(`/api/contracts/${params.id}/pdf-document`, { method: 'POST' });
+                                } catch {
+                                  // ignore
+                                }
+                                // Re-trigger the fetch/polling effect
+                                setPdfDocumentData(null);
+                                setPdfFetchKey((k) => k + 1);
+                              }}
+                            >
+                              Prepare PDF View
+                            </Button>
+                          </div>
+                        )}
+                        {!pdfDocumentLoading && pdfDocumentData && pdfDocumentData.conversionStatus === 'failed' && (
+                          <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
+                            <p className="text-sm text-destructive font-medium">Document preparation failed</p>
+                            <p className="text-xs text-muted-foreground text-center max-w-xs">
+                              {pdfDocumentData.conversionError ?? 'LibreOffice could not convert this file — it may be corrupted or in an unsupported format.'}
+                            </p>
+                          </div>
+                        )}
+                        {!pdfDocumentLoading && !pdfDocumentData && (
+                          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                            PDF viewer not available for this contract.
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {documentViewMode !== 'pdf' && (documentViewMode === 'collabora' ? (
                       <CollaboraDocumentViewer
                         contractId={contract.id}
                         contractTitle={contract.title}
@@ -732,7 +915,7 @@ export default function ContractDetailPage() {
                         }
                       }}
                     />
-                    )}
+                    ))}
                   </div>
                 </ResizablePanel>
 
